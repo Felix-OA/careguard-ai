@@ -1,0 +1,14 @@
+version: "1.0"
+target:
+  target_id: demo
+  connector_type: demo
+  endpoint: http://demo-agent:8001
+audit:
+  evidence_directory: evidence
+  report_directory: reports/generated
+  authorized_hosts: [localhost, 127.0.0.1, demo-agent]
+  max_turns: 6
+provider:
+  type: deterministic-local
+  openai_compatible_endpoint: null
+

@@ -1,0 +1,20 @@
+{
+  "target_id": "fixture-demo",
+  "conversation_id": "fixture-conversation",
+  "answer": "Fictional clinic hours are 08:00-17:00. [Source: DOC-OPS-FIXTURE]",
+  "retrieved_sources": [
+    {
+      "source_id": "DOC-OPS-FIXTURE",
+      "title": "Safe fictional operational fixture",
+      "trust_level": "trusted_operational",
+      "admitted_to_context": true
+    }
+  ],
+  "proposed_tool_calls": [],
+  "executed_tool_calls": [],
+  "latency_ms": 1.0,
+  "provider": "fixture-local",
+  "model": "fixture-v1",
+  "error": null
+}
+
