@@ -2,26 +2,30 @@ from __future__ import annotations
 
 from time import perf_counter
 
-import httpx
-
 from careguard.connectors.base import TargetConnector
+from careguard.connectors.http_safety import bounded_json_post
 from careguard.models.schemas import NormalizedRequest, NormalizedResponse, SourceMetadata, ToolCall
 from careguard.security import ensure_authorized_endpoint
 
 
 class RestChatConnector(TargetConnector):
-    def __init__(self, endpoint: str, headers: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, endpoint: str, headers: dict[str, str] | None = None, timeout_seconds: int = 15,
+    ) -> None:
         ensure_authorized_endpoint(endpoint)
         self.endpoint = endpoint
         self._headers = headers or {}
+        self._timeout_seconds = timeout_seconds
 
     async def send(self, request: NormalizedRequest) -> NormalizedResponse:
         started = perf_counter()
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.post(self.endpoint, json=request.model_dump(mode="json"), headers=self._headers)
-                response.raise_for_status()
-                data = response.json()
+            data = await bounded_json_post(
+                self.endpoint,
+                payload=request.model_dump(mode="json"),
+                headers=self._headers,
+                timeout_seconds=self._timeout_seconds,
+            )
             return NormalizedResponse(
                 target_id=request.target_id,
                 conversation_id=request.conversation_id,
@@ -44,9 +48,12 @@ class RestChatConnector(TargetConnector):
 class OpenAICompatibleConnector(TargetConnector):
     """Optional local/authorized OpenAI-compatible adapter; API key stays in this object."""
 
-    def __init__(self, endpoint: str, model: str, api_key: str | None = None) -> None:
+    def __init__(
+        self, endpoint: str, model: str, api_key: str | None = None, timeout_seconds: int = 20,
+    ) -> None:
         ensure_authorized_endpoint(endpoint)
         self.endpoint, self.model, self._api_key = endpoint, model, api_key
+        self._timeout_seconds = timeout_seconds
 
     async def send(self, request: NormalizedRequest) -> NormalizedResponse:
         started = perf_counter()
@@ -54,12 +61,12 @@ class OpenAICompatibleConnector(TargetConnector):
         messages.append({"role": "user", "content": request.user_message})
         headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else {}
         try:
-            async with httpx.AsyncClient(timeout=20) as client:
-                response = await client.post(
-                    self.endpoint, headers=headers, json={"model": self.model, "messages": messages}
-                )
-                response.raise_for_status()
-                data = response.json()
+            data = await bounded_json_post(
+                self.endpoint,
+                headers=headers,
+                payload={"model": self.model, "messages": messages},
+                timeout_seconds=self._timeout_seconds,
+            )
             return NormalizedResponse(
                 target_id=request.target_id, conversation_id=request.conversation_id,
                 answer=data["choices"][0]["message"].get("content", ""),
@@ -73,4 +80,3 @@ class OpenAICompatibleConnector(TargetConnector):
                 provider="openai-compatible", model=self.model,
                 error=f"OpenAI-compatible connector error: {type(exc).__name__}",
             )
-

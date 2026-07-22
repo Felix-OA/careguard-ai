@@ -4,9 +4,8 @@ import re
 from pathlib import Path
 from threading import RLock
 
-import httpx
-
 from careguard.connectors.base import TargetConnector
+from careguard.connectors.http_safety import bounded_json_post
 from careguard.models.schemas import NormalizedRequest, NormalizedResponse
 from careguard.security import ensure_authorized_endpoint
 from careguard_guard.config import load_guard_config
@@ -17,13 +16,17 @@ from careguard_guard.pipeline import GuardPipeline
 class GuardConnector(TargetConnector):
     """In-process deterministic adapter used for fixed-suite guarded audits."""
 
-    def __init__(self, event_root: Path, mode: str = "enforce", endpoint: str | None = None) -> None:
+    def __init__(
+        self, event_root: Path, mode: str = "enforce", endpoint: str | None = None,
+        timeout_seconds: int = 15,
+    ) -> None:
         self.endpoint = endpoint
         if endpoint:
             ensure_authorized_endpoint(endpoint)
             self.pipeline = None
         else:
             self.pipeline = GuardPipeline(load_guard_config(mode=mode), event_root)
+        self._timeout_seconds = timeout_seconds
         self._confirmation_tokens: dict[str, str] = {}
         self._patient_scopes: dict[str, dict[str, str]] = {}
         self._state_lock = RLock()
@@ -57,14 +60,14 @@ class GuardConnector(TargetConnector):
         )
         if self.endpoint:
             try:
-                async with httpx.AsyncClient(timeout=15) as client:
-                    response = await client.post(
-                        self.endpoint, json=guard_request.model_dump(mode="json")
-                    )
-                    response.raise_for_status()
-                    from careguard_guard.models import GuardChatResponse
+                payload = await bounded_json_post(
+                    self.endpoint,
+                    payload=guard_request.model_dump(mode="json"),
+                    timeout_seconds=self._timeout_seconds,
+                )
+                from careguard_guard.models import GuardChatResponse
 
-                    guarded = GuardChatResponse.model_validate(response.json())
+                guarded = GuardChatResponse.model_validate(payload)
             except Exception as exc:
                 return NormalizedResponse(
                     target_id="demo-guarded", conversation_id=request.conversation_id,
@@ -101,5 +104,10 @@ class GuardConnector(TargetConnector):
                 "guard_config_version": guarded.guard_config_version,
                 "event_id": guarded.event_id,
                 "final_decision": guarded.final_decision.value,
+                "reason_codes": guarded.reason_codes,
+                "triggered_policies": guarded.triggered_policies,
+                "redaction_count": sum(item.count for item in guarded.redactions),
+                "human_review_required": guarded.human_review_required,
+                "confirmation_status": guarded.confirmation_status,
             },
         )

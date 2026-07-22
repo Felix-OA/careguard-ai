@@ -1,6 +1,6 @@
 # CareGuard AI
 
-CareGuard AI is a defensive, local-first system for assessing and applying bounded runtime controls to healthcare patient-support and healthcare-information AI applications. Stage 1 provides **Audit**; Stage 2 adds the functional **CareGuard Guard** gateway. Regression Monitor and a dashboard remain future work.
+CareGuard AI is a defensive, local-first system for assessing and applying bounded runtime controls to healthcare patient-support and healthcare-information AI applications. Stage 1 provides **Audit**, Stage 2 adds the functional **CareGuard Guard** gateway, and Stage 3 adds a working dashboard and local company-onboarding workflow. Regression scheduling remains future work.
 
 CareGuard is intended for authorized AI security and application teams. It uses only fictional data, provides no diagnosis or personalized treatment, and does not claim HIPAA compliance, clinical validation, regulatory approval, complete prompt-injection prevention, production readiness, or a production security guarantee.
 
@@ -13,6 +13,7 @@ CareGuard is intended for authorized AI security and application teams. It uses 
 - `enforce` mode that applies blocks, context filtering/refill, redaction, policy escalation, tool authorization, and bounded confirmation.
 - Protected raw target responses and structured Guard events with stable reason codes and distinct proposed/authorized/confirmed/executed/blocked/failed tool states.
 - Baseline `demo` and guarded `demo-guarded` audits using the identical scenario suite, plus Markdown/JSON comparisons.
+- A React/TypeScript dashboard with server-persisted onboarding, target configuration, audit jobs, comparisons, sanitized Guard events, a separate human-review workflow, policies, safe reports, and a guided synthetic demo.
 - No paid provider or API key in the default path.
 
 ## Architecture
@@ -29,7 +30,9 @@ CareGuard Guard :8002
           v
 Synthetic demo agent :8001
 
-CareGuard Audit API :8000 -> baseline or guarded connector -> evidence/reports
+Browser -> Dashboard :3000 -> same-origin /api -> Audit API :8000
+                                            -> sanitized dashboard aggregation
+                                            -> baseline/guarded evidence and reports
 ```
 
 The demo’s `/internal/retrieve` and `/internal/generate` hooks are restricted to loopback, test, and Docker-network clients and let Guard inspect candidates before generation. They are unauthenticated test fixtures, not a recommended production interface. The original `/chat` remains the intentionally weak Stage 1 baseline.
@@ -44,6 +47,7 @@ docker compose up --build
 - Audit API: <http://localhost:8000/docs>
 - Synthetic demo agent: <http://localhost:8001/docs>
 - Guard gateway: <http://localhost:8002/docs>
+- Dashboard: <http://127.0.0.1:3000>
 - Health endpoints: `:8000/health`, `:8001/health`, and `:8002/health`
 
 Restart after changing `.env` or Guard configuration:
@@ -54,6 +58,10 @@ docker compose up --build
 ```
 
 Set `CAREGUARD_GUARD_MODE=monitor` or `enforce` in `.env`. Monitor observes and intentionally preserves unsafe baseline traffic; it is not protection. `POST /v1/config/reload` reloads validated YAML and the environment-selected mode, and clears process-local confirmation/conversation state.
+
+The browser talks only to `/api/` on the dashboard origin; nginx proxies that path to the Audit API. It never contacts Guard or the demo agent directly. API and static responses are marked `no-store`. Complete `/onboarding` first, then use `/audits/new` to run baseline and guarded suites and `/comparisons` to compare equivalent runs. Credential values are never accepted by the UI: onboarding may select only the allowlisted server-side reference `OPENAI_COMPATIBLE_API_KEY`, and dashboard responses expose only `Not configured`, `Configured server-side`, or `Unavailable`.
+
+Stage 3 external-target onboarding requires an explicit authorization acknowledgement and accepts only exact HTTP origins on the two synthetic service ports (`8001` and `8002`) with allowlisted chat paths. Public hosts, alternate ports, URL credentials, query strings, fragments, redirects, and unsupported schemes are rejected. Connector timeouts are bounded and connector JSON responses are capped at one megabyte. These application checks do not replace production network egress controls.
 
 ## Local CLI workflow
 
@@ -107,7 +115,7 @@ These locations are ignored by Git. Public Guard responses/events hide raw reque
 
 Deep integration exposes retrieval candidates to Guard and supports context admission before generation. An external proxy-only connector can inspect requests, responses, and proposed tools, but it cannot filter model context unless the target supplies an authorized retrieval/generation hook. Audit-time testing replays fixed scenarios and scores evidence; runtime protection evaluates each live local request and records a Guard event.
 
-See the [architecture](docs/architecture.md), [Guard pipeline](docs/guard-pipeline.md), [policy configuration](docs/policy-configuration.md), [policy coverage](docs/policy-coverage.md), [tool controls](docs/tool-control.md), [connector guide](docs/connector-guide.md), [threat model](docs/threat-model.md), [pre-Stage-3 validation](docs/pre-stage-3-validation.md), and [roadmap](docs/product-roadmap.md).
+See the [dashboard guide](docs/dashboard-guide.md), [company onboarding](docs/company-onboarding.md), [human-review workflow](docs/human-review-workflow.md), [dashboard security](docs/dashboard-security.md), [architecture](docs/architecture.md), [Guard pipeline](docs/guard-pipeline.md), [policy configuration](docs/policy-configuration.md), [policy coverage](docs/policy-coverage.md), [tool controls](docs/tool-control.md), [connector guide](docs/connector-guide.md), [threat model](docs/threat-model.md), [pre-Stage-3 validation](docs/pre-stage-3-validation.md), and [roadmap](docs/product-roadmap.md).
 
 ## Validation
 
@@ -116,6 +124,7 @@ pytest
 python -m compileall careguard demo_health_agent careguard_guard
 docker compose config
 python scripts/smoke_test.py  # after the Compose stack is healthy
+cd frontend && npm ci && npm run typecheck && npm run lint && npm test -- --run && npm run build
 ```
 
 ## Known limitations and responsible use
@@ -123,6 +132,10 @@ python scripts/smoke_test.py  # after the Compose stack is healthy
 - Controls are transparent deterministic rules, not complete semantic security.
 - Process-local confirmation tokens demonstrate binding and expiry; they are not production authentication.
 - SQLite and local files are development storage, not a distributed security event platform.
+- The dashboard has no production authentication, authorization, multi-tenancy, policy approval, or distributed job queue.
+- Dashboard audit jobs execute synchronously in one API process. Persisted active jobs are marked failed after process restart; there is no cancellation, worker lease, scheduling, or cross-process coordination.
+- Dashboard reports are deliberately less detailed than protected local evidence: raw prompts/responses, source excerpts, tool arguments, secret references, and local paths are excluded.
+- Superseded audit review items remain available as history but are excluded from the current unresolved count.
 - Client-supplied role/scope metadata demonstrates policy behavior; production identity must be authenticated and server-derived.
 - Message hashes aid correlation/integrity checking and are not anonymization.
 - Generic external connectors lack deep context admission unless they implement the integration hook.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, PlainTextResponse
@@ -11,6 +12,7 @@ from careguard import __version__
 from careguard.audit import AuditRunner
 from careguard.config import load_policy_pack, load_scenario_pack
 from careguard.connectors import DemoConnector, GuardConnector, OpenAICompatibleConnector, RestChatConnector
+from careguard.dashboard.routes import router as dashboard_router
 from careguard.evidence import EvidenceStore
 from careguard.models.schemas import (
     AuditRequest, AuditSummary, ComparisonRequest, ComparisonSummary, Target, TargetCreate,
@@ -21,6 +23,7 @@ from careguard.security import ensure_authorized_endpoint
 from careguard.storage import Database
 
 app = FastAPI(title="CareGuard AI API", version=__version__)
+app.include_router(dashboard_router)
 
 
 def data_root() -> Path:
@@ -36,23 +39,35 @@ def evidence_store() -> EvidenceStore:
     return EvidenceStore(data_root() / "evidence")
 
 
-def connector_for(target: Target):
+def connector_for(
+    target: Target,
+    *,
+    chat_path: str | None = None,
+    timeout_seconds: int | None = None,
+    credential_env_reference: str | None = None,
+):
+    endpoint = target.endpoint
+    if endpoint and chat_path and urlsplit(endpoint).path in {"", "/"}:
+        endpoint = f"{endpoint.rstrip('/')}{chat_path}"
     if target.connector_type == "demo":
-        return DemoConnector(target.endpoint)
+        return DemoConnector(target.endpoint, timeout_seconds=timeout_seconds or 10)
     if target.connector_type == "guard":
         endpoint = target.endpoint or os.getenv("CAREGUARD_GUARD_URL")
         if endpoint:
             endpoint = f"{endpoint.rstrip('/')}/v1/chat" if not endpoint.rstrip('/').endswith("/v1/chat") else endpoint
-        return GuardConnector(data_root() / "guard", endpoint=endpoint)
-    if not target.endpoint:
+        return GuardConnector(
+            data_root() / "guard", endpoint=endpoint, timeout_seconds=timeout_seconds or 15,
+        )
+    if not endpoint:
         raise HTTPException(422, "connector endpoint is required")
-    ensure_authorized_endpoint(target.endpoint)
+    ensure_authorized_endpoint(endpoint)
     if target.connector_type == "rest":
-        return RestChatConnector(target.endpoint)
+        return RestChatConnector(endpoint, timeout_seconds=timeout_seconds or 15)
     return OpenAICompatibleConnector(
-        target.endpoint,
+        endpoint,
         target.model or os.getenv("OPENAI_COMPATIBLE_MODEL", "local-model"),
-        os.getenv("OPENAI_COMPATIBLE_API_KEY"),
+        os.getenv(credential_env_reference or "OPENAI_COMPATIBLE_API_KEY"),
+        timeout_seconds=timeout_seconds or 20,
     )
 
 

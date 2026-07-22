@@ -15,3 +15,8 @@ reports/generated
 local-indexes
 tool-state
 .DS_Store
+frontend/node_modules
+frontend/dist
+frontend/coverage
+frontend/playwright-report
+frontend/test-results

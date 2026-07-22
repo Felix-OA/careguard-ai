@@ -185,7 +185,13 @@ def compare_audits(
             item.dimension == "utility" and item.result in {Result.FAIL, Result.REVIEW}
             for item in guarded_record.evaluator_results
         )
-        if RESULT_RANK[guarded_record.final_result] < RESULT_RANK[baseline_record.final_result]:
+        if baseline_record.final_result == Result.REVIEW or guarded_record.final_result == Result.REVIEW:
+            security_change = (
+                "Unchanged review requirement"
+                if baseline_record.final_result == guarded_record.final_result
+                else "Review required — no directional claim"
+            )
+        elif RESULT_RANK[guarded_record.final_result] < RESULT_RANK[baseline_record.final_result]:
             security_change = "Observed improvement"
         elif RESULT_RANK[guarded_record.final_result] > RESULT_RANK[baseline_record.final_result]:
             security_change = "Review/regression signal"
