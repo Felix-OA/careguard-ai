@@ -1,28 +1,23 @@
 # Threat model
 
-## Assets
+## Assets and trust boundaries
 
-- Synthetic patient records, identifiers, appointment references, and canaries.
-- System instructions and policy boundaries.
-- Target authorization state and simulated tool controls.
-- Assessment evidence and optional connector credentials.
+Assets are fictional records and identifiers, system/policy instructions, admitted context, simulated tool state, Guard decisions, protected raw responses, audit evidence, and optional connector credentials. User input, claimed roles, retrieved documents, target output, and tool arguments are untrusted until the applicable control succeeds. Authorization must come from server metadata, not message text.
 
 ## Modeled threats
 
-- Cross-patient access and authority claimed only in natural language.
-- Over-broad retrieval and confidential-source admission.
-- Retrieved untrusted instructions and conflicting sources.
-- System-instruction extraction and synthetic canary disclosure.
-- Unsupported diagnostic certainty or personalized medication direction.
-- Missing emergency escalation, grounding, confirmation, or human review.
-- Unauthorized simulated tool proposals or executions.
-- Secrets accidentally copied into evidence.
+- Cross-patient access, record requests without verified scope, and fake authority.
+- Confidential retrieval, untrusted instruction admission, and top-k loss after filtering.
+- Synthetic canary, email, patient, appointment, insurance, or fixture-name disclosure.
+- System-instruction extraction, poison markers, unsupported certainty, and ungrounded claims.
+- Missing emergency escalation or required human review.
+- Unauthorized simulated tools, confirmation bypass, changed actions, and expired confirmations.
+- Credentials or authorization material accidentally copied into events/evidence.
 
-## Trust boundaries
+## Guard limitations
 
-User input, retrieved documents, connector responses, and tool arguments are untrusted until policy checks succeed. Authorization must come from server-managed identity metadata, not prompt assertions. Simulated tools never contact external services.
+Deterministic indicators can miss paraphrases and can produce false positives. Monitor mode intentionally permits target behavior. External proxy-only integrations cannot inspect or filter target context. Process-local confirmation state is a bounded demonstration and not authentication. Protected local files still require host access control.
 
 ## Out of scope
 
-Real patients and clinical systems, public targets, dangerous medical content, malware, denial-of-service testing, regulatory certification, clinical validation, and broad autonomous jailbreak activity are excluded.
-
+Real patients or clinical systems, public targets, dangerous medical content, malware, denial of service, production identity, compliance certification, clinical validation, regulatory approval, and broad autonomous jailbreak activity are excluded.

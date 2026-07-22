@@ -1,14 +1,21 @@
 # Architecture
 
-CareGuard Stage 1 has five executable boundaries:
+CareGuard has two complementary execution planes.
 
-1. **Catalogs** load and validate the versioned policy and scenario YAML files with Pydantic v2.
-2. **Connectors** translate a common conversation request into a demo, REST, or OpenAI-compatible target call and normalize the answer, sources, tools, provider identity, latency, and errors.
-3. **Audit runner** preserves multi-turn history, invokes the connector, and keeps retrieval, admission, answer, tool proposal, and tool execution evidence distinct.
-4. **Evaluators** apply deterministic checks and return `PASS`, `PARTIAL`, `FAIL`, or `REVIEW` with a named evidence dimension.
-5. **Evidence/reporting** appends one sanitized JSONL record per scenario, indexes run metadata in SQLite, and derives Markdown/JSON reports.
+The **audit plane** loads the fixed policy/scenario catalogs, invokes a normalized target connector, applies deterministic evaluators, writes backward-compatible JSONL evidence, indexes runs in SQLite, and derives audit/comparison reports. Targets `demo` and `demo-guarded` use the same scenario IDs and expected behavior.
 
-The CareGuard API and demo target are separate FastAPI services under Docker Compose. The CLI can use the demo engine in-process for a zero-network local workflow. Both paths execute the same normalized target behavior.
+The **runtime plane** is the separate CareGuard Guard service. Its pipeline is:
 
-The default provider is extractive/deterministic. The optional OpenAI-compatible connector reads its key only from server environment state and is restricted to an authorized local endpoint in Stage 1.
+1. Inspect normalized request, history, role, and verified synthetic patient scope.
+2. Fetch raw candidates through the demo’s local-only retrieval hook.
+3. classify candidates as rejected or eligible, refill with trusted candidates when exclusions reduce context, and record every state.
+4. Ask the deterministic target to generate with admitted context while tool execution is disabled.
+5. Inspect/redact or withhold the response.
+6. Authorize proposed tools and apply conversation/action-bound confirmation.
+7. Store a sanitized security event and a protected raw response reference.
 
+Monitor mode generates through raw target context and permits baseline tool behavior while computing the enforce-mode decisions. Enforce mode applies the guarded context and controls.
+
+Docker runs three services: audit API `8000`, demo agent `8001`, and Guard `8002`. All default providers and tools are local and deterministic.
+
+Audit-time testing scores fixed evidence after a scenario. Runtime protection makes and records an immediate decision for each request. Neither is a substitute for qualified review.

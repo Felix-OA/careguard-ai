@@ -38,4 +38,3 @@ def validate_configuration() -> tuple[PolicyPack, ScenarioPack]:
     if unknown:
         raise ValueError(f"scenarios reference unknown policies: {sorted(unknown)}")
     return policies, scenarios
-

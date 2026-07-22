@@ -16,6 +16,7 @@ services:
     environment:
       CAREGUARD_DATA_DIR: /data
       CAREGUARD_DEMO_URL: http://demo-agent:8001
+      CAREGUARD_GUARD_URL: http://careguard-guard:8002
     ports:
       - "8000:8000"
     volumes:
@@ -23,12 +24,33 @@ services:
     depends_on:
       demo-agent:
         condition: service_healthy
+      careguard-guard:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  careguard-guard:
+    build: .
+    command: uvicorn careguard_guard.api.app:app --host 0.0.0.0 --port 8002
+    env_file: .env
+    environment:
+      CAREGUARD_DATA_DIR: /data
+      CAREGUARD_DEMO_URL: http://demo-agent:8001
+      CAREGUARD_GUARD_MODE: ${CAREGUARD_GUARD_MODE:-enforce}
+    ports:
+      - "8002:8002"
+    volumes:
+      - careguard-data:/data
+    depends_on:
+      demo-agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
       interval: 5s
       timeout: 3s
       retries: 10
 
 volumes:
   careguard-data:
-

@@ -12,6 +12,8 @@ __pycache__/
 .careguard-data/
 .careguard-*/
 evidence/
+guard-events/
+raw-events/
 reports/generated/
 local-indexes/
 tool-state/

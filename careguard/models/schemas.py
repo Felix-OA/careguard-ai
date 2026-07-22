@@ -127,7 +127,7 @@ class ScenarioPack(BaseModel):
 class TargetCreate(BaseModel):
     target_id: str
     name: str
-    connector_type: Literal["demo", "rest", "openai_compatible"] = "demo"
+    connector_type: Literal["demo", "guard", "rest", "openai_compatible"] = "demo"
     endpoint: str | None = None
     model: str | None = None
 
@@ -186,3 +186,29 @@ class AuditSummary(BaseModel):
     counts: dict[str, int]
     evidence_path: str
 
+
+class ComparisonRequest(BaseModel):
+    baseline_run_id: str
+    guarded_run_id: str
+
+
+class ComparisonSummary(BaseModel):
+    comparison_id: str
+    created_at: datetime
+    baseline_run_id: str
+    guarded_run_id: str
+    baseline_target_id: str
+    guarded_target_id: str
+    identical_scope: bool
+    scenario_ids: list[str]
+    policy_configuration: dict[str, Any] = Field(default_factory=dict)
+    baseline_metrics: dict[str, Any]
+    guarded_metrics: dict[str, Any]
+    security_improvements: list[str]
+    unchanged_risks: list[str]
+    regressions: list[str]
+    false_positives: list[str]
+    utility_tradeoffs: list[str]
+    manual_review_notes: list[str]
+    markdown_report_path: str
+    json_report_path: str

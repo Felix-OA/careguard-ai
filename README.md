@@ -1,62 +1,61 @@
 # CareGuard AI
 
-CareGuard AI is a defensive, local-first foundation for auditing healthcare patient-support and healthcare-information AI applications. Stage 1 implements the **Audit** module against a deliberately imperfect synthetic demo target. Guard and Regression Monitor are documented future modules.
+CareGuard AI is a defensive, local-first system for assessing and applying bounded runtime controls to healthcare patient-support and healthcare-information AI applications. Stage 1 provides **Audit**; Stage 2 adds the functional **CareGuard Guard** gateway. Regression Monitor and a dashboard remain future work.
 
-CareGuard is intended for AI security engineers, application teams, healthcare technology risk teams, and authorized assessors. It is not a medical service. It provides no diagnosis or personalized treatment and makes no claim of HIPAA compliance, regulatory approval, or medical-device status.
+CareGuard is intended for authorized AI security and application teams. It uses only fictional data, provides no diagnosis or personalized treatment, and does not claim HIPAA compliance, clinical validation, regulatory approval, complete prompt-injection prevention, production readiness, or a production security guarantee.
 
-## What Stage 1 includes
+## Implemented capabilities
 
-- A separate FastAPI synthetic healthcare target with chat, retrieval debug, and health endpoints.
-- Fictional records, appointments, `example.test` emails, canaries, trust-labeled documents, and four local simulated tools.
-- A versioned 15-policy healthcare policy pack and 20 safe synthetic scenarios.
-- Demo, generic REST, and optional OpenAI-compatible normalized connectors.
-- Deterministic audit execution with multi-turn history and 14 evaluator types.
-- Timestamped JSONL evidence, SQLite run metadata, Markdown/JSON reports, REST API, and CLI.
-- Localhost/explicit-container-host target restriction and secret redaction.
+- A deliberately imperfect synthetic healthcare target with four local simulated tools.
+- A versioned 15-policy pack, 20 safe scenarios, deterministic evaluators, JSONL evidence, SQLite metadata, reports, API, and CLI.
+- A separate Guard FastAPI gateway with request, retrieval/context, response, tool, redaction, escalation, and confirmation controls.
+- `monitor` mode that preserves traffic while recording what enforce mode would do.
+- `enforce` mode that applies blocks, context filtering/refill, redaction, policy escalation, tool authorization, and bounded confirmation.
+- Protected raw target responses and structured Guard events with stable reason codes.
+- Baseline `demo` and guarded `demo-guarded` audits using the identical scenario suite, plus Markdown/JSON comparisons.
 - No paid provider or API key in the default path.
 
 ## Architecture
 
 ```text
-scenarios + policy pack
+Client / fixed audit suite
           |
           v
-  CareGuard audit runner ---> normalized connector ---> synthetic demo agent
-          |                                             | retrieval + tools
-          v
- deterministic evaluators
+CareGuard Guard :8002
+  request policy -> raw retrieval -> context admission/refill
+  -> deterministic target generation -> response/redaction
+  -> tool authorization/confirmation -> security event
           |
-          +--> JSONL evidence --> Markdown / JSON report
-          +--> SQLite run and target index
+          v
+Synthetic demo agent :8001
+
+CareGuard Audit API :8000 -> baseline or guarded connector -> evidence/reports
 ```
 
-The demo agent intentionally has over-broad retrieval, poor trust separation, weak synthetic-record authorization, occasional unsupported certainty, and weak action confirmation. Those are target findings, not recommended implementation patterns.
+The demo’s `/internal/retrieve` and `/internal/generate` hooks are restricted to local/private network clients and let Guard inspect candidates before generation. The original `/chat` remains the intentionally weak Stage 1 baseline.
 
-## One-command container setup
-
-Requirements: Docker with Compose.
+## Docker setup
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-- CareGuard API and docs: <http://localhost:8000/docs>
-- Demo agent API and docs: <http://localhost:8001/docs>
-- CareGuard health: <http://localhost:8000/health>
-- Demo health: <http://localhost:8001/health>
+- Audit API: <http://localhost:8000/docs>
+- Synthetic demo agent: <http://localhost:8001/docs>
+- Guard gateway: <http://localhost:8002/docs>
+- Health endpoints: `:8000/health`, `:8001/health`, and `:8002/health`
 
-Run a complete demo audit through the API:
+Restart after changing `.env` or Guard configuration:
 
 ```bash
-curl -sS -X POST http://localhost:8000/audits \
-  -H 'content-type: application/json' \
-  -d '{"target_id":"demo"}'
+docker compose down
+docker compose up --build
 ```
 
-Use the returned `run_id` with `/audits/{run_id}`, `/findings`, or `/report?format=markdown|json`.
+Set `CAREGUARD_GUARD_MODE=monitor` or `enforce` in `.env`. `POST /v1/config/reload` reloads YAML and environment-selected mode inside a running Guard service.
 
-## Local Python workflow
+## Local CLI workflow
 
 Use Python 3.11 or newer:
 
@@ -65,40 +64,66 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 python -m careguard.cli check-config
-python -m careguard.cli list-scenarios
 python -m careguard.cli run-audit --target demo
-python -m careguard.cli generate-report --latest
+python -m careguard.cli run-audit --target demo-guarded
+python -m careguard.cli compare-audits --baseline <baseline_run_id> --guarded <guarded_run_id>
+python -m careguard.cli generate-report --run-id <run_id>
 ```
 
-Raw JSONL evidence is written under `.careguard-data/evidence/`; generated reports are under `.careguard-data/reports/`. Both are ignored by Git because even synthetic local evidence should be handled deliberately. A static, reviewed example is in `reports/samples/`.
+The CLI’s guarded connector is an in-process adapter to the same Guard pipeline. In Docker, the audit API uses the separate `careguard-guard` service.
 
-Run validation:
+## API workflows
+
+Guard a synthetic request:
+
+```bash
+curl -sS -X POST http://localhost:8002/v1/chat \
+  -H 'content-type: application/json' \
+  -d '{"conversation_id":"example","user_message":"What are the clinic hours?","role_metadata":{"role":"guest"}}'
+```
+
+Run baseline and guarded audits:
+
+```bash
+curl -sS -X POST http://localhost:8000/audits -H 'content-type: application/json' -d '{"target_id":"demo"}'
+curl -sS -X POST http://localhost:8000/audits -H 'content-type: application/json' -d '{"target_id":"demo-guarded"}'
+curl -sS -X POST http://localhost:8000/audits/compare -H 'content-type: application/json' \
+  -d '{"baseline_run_id":"<baseline>","guarded_run_id":"<guarded>"}'
+```
+
+Guard endpoints include `/v1/policies`, `/v1/events`, `/v1/events/{event_id}`, `/v1/metrics`, and `/v1/config/reload`. Audit comparison endpoints include `/comparisons`, `/comparisons/{id}`, and `/comparisons/{id}/report?format=markdown|json`.
+
+## Local data locations
+
+- Audit evidence: `.careguard-data/evidence/*.jsonl`
+- Audit reports: `.careguard-data/reports/`
+- Guard events: `.careguard-data/guard/guard-events.db`
+- Protected raw target responses: `.careguard-data/guard/protected/`
+- Comparison reports: `.careguard-data/reports/comparisons/`
+
+These locations are ignored by Git. Public Guard responses never include a protected raw response. Reviewed samples live in `reports/samples/`.
+
+## Integration boundaries
+
+Deep integration exposes retrieval candidates to Guard and supports context admission before generation. An external proxy-only connector can inspect requests, responses, and proposed tools, but it cannot filter model context unless the target supplies an authorized retrieval/generation hook. Audit-time testing replays fixed scenarios and scores evidence; runtime protection evaluates each live local request and records a Guard event.
+
+See the [architecture](docs/architecture.md), [Guard pipeline](docs/guard-pipeline.md), [policy configuration](docs/policy-configuration.md), [tool controls](docs/tool-control.md), [connector guide](docs/connector-guide.md), [threat model](docs/threat-model.md), and [roadmap](docs/product-roadmap.md).
+
+## Validation
 
 ```bash
 pytest
-python -m compileall careguard demo_health_agent
+python -m compileall careguard demo_health_agent careguard_guard
 docker compose config
+python scripts/smoke_test.py  # after the Compose stack is healthy
 ```
 
-## Adding a custom connector
+## Known limitations and responsible use
 
-Implement `TargetConnector.send(NormalizedRequest) -> NormalizedResponse`, keep credentials inside the connector, and map source/tool/error information into the normalized schema. Stage 1 rejects non-local endpoints by default; extend the allowlist only for a target you own or are explicitly authorized to assess. See [docs/connector-guide.md](docs/connector-guide.md).
+- Controls are transparent deterministic rules, not complete semantic security.
+- Process-local confirmation tokens demonstrate binding and expiry; they are not production authentication.
+- SQLite and local files are development storage, not a distributed security event platform.
+- Generic external connectors lack deep context admission unless they implement the integration hook.
+- Qualified clinical, security, privacy, and legal review remains necessary.
 
-## Synthetic-data restrictions
-
-Only fictional data may be used. Never place real patient information, identifiers, medical records, credentials, authorization headers, or API keys in scenarios, evidence, fixtures, or reports. The demo target does not call real healthcare services, book real visits, or escalate real cases.
-
-## Known limitations
-
-- Rules are deterministic and are not a substitute for expert clinical, security, privacy, or legal review.
-- Stage 1 runs approved scenarios; it does not conduct broad autonomous red teaming.
-- The demo target is intentionally vulnerable and must not be treated as production code.
-- Local SQLite execution is intended for development, not distributed production workloads.
-- The generic connector expects a documented normalized response shape.
-
-See [architecture](docs/architecture.md), [threat model](docs/threat-model.md), [scenario design](docs/scenario-design.md), [connector guide](docs/connector-guide.md), and [roadmap](docs/product-roadmap.md).
-
-## Responsible use
-
-CareGuard Stage 1 is a synthetic local assessment tool. It is not a compliance certification, clinical validation, or production security guarantee. Test only localhost, container-local services, or targets you are explicitly authorized to assess.
-
+Use only synthetic data and localhost, container-local services, or targets you are explicitly authorized to assess. The demo does not contact healthcare or booking services.
