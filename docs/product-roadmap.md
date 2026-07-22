@@ -16,6 +16,8 @@ Not implemented: scheduled replay/regression monitoring, production identity/acc
 
 The pre-Stage-3 hardening pass establishes trustworthy fixed-suite evidence and a bounded local runtime. It does not make Stages 1–2 production-ready. See [pre-Stage-3 validation](pre-stage-3-validation.md).
 
-## Stage 4 boundary and future controlled agentic audit
+## Stage 4 — Controlled multi-turn agentic audit
 
-The interface in `careguard.audit.agentic` remains a non-operational contract for approved objectives, strict turn/cost limits, conversation evidence, and authorized localhost targets. Stage 3 does not add GOAT, autonomous attack generation, public scanning, or agentic auditing.
+Implemented: a separate versioned healthcare objective pack, 10 safe strategy categories and templates, deterministic seeded attacker, optional loopback-only model selector and secondary judge, bounded synchronous orchestration, explicit stops/cancellation, target-output injection defenses, sanitized transactional trajectory evidence, agentic reports/API/CLI/dashboard, REVIEW queue integration, and scope-validated baseline-versus-Guard comparisons.
+
+This is a GOAT-inspired high-level architecture, not an official GOAT implementation or research reproduction. It does not add autonomous attack infrastructure, public scanning, arbitrary prompts, tools, shell/filesystem/browser access, production identity, worker isolation, scheduling, hosted execution, or a claim of production readiness.

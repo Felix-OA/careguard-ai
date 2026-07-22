@@ -17,6 +17,10 @@ The Stage 3 dashboard is a local React 19/TypeScript/Vite application served at 
 | `/reports`, `/reports/:type/:id` | Safe Markdown preview and Markdown/JSON export |
 | `/demo` | Approved baseline-versus-guarded fictional prompts |
 | `/settings` | Service health, versions, and explicit non-goals |
+| `/agentic`, `/agentic/new` | Controlled campaign history/comparison and bounded campaign wizard |
+| `/agentic/:campaignId` | Versioned limits, outcome counts, objective results, and report link |
+| `/agentic/:campaignId/objectives/:objectiveRunId` | Sanitized attacker/target/Guard/evaluator trajectory timeline |
+| `/agentic/comparisons/:comparisonId` | Scope-validated baseline-versus-guarded trajectory comparison |
 
 ## Typical workflow
 
@@ -26,4 +30,6 @@ The event view distinguishes a genuinely empty event store from an unavailable G
 
 All pages include semantic headings and labels, visible focus, keyboard navigation, status text as well as color, reduced-motion handling, responsive layouts, safe error/empty/loading states, table captions, and a table alternative for the chart. This is not an accessibility certification; verify with the target assistive-technology matrix before productization.
 
-The dashboard is a single-operator local demonstration. It has no authentication, multi-tenancy, scheduling, formal review authority, production policy governance, or clinical/compliance status. Stage 4 agentic auditing is not present.
+For Stage 4, choose baseline or protected path, then an enabled compatible local target, objective scope, attacker type, seed, and hard limits. The acknowledgement is mandatory. Model credentials and provider URLs never enter the browser. The trajectory UI distinguishes attacker, target/Guard, evaluator, and reviewer layers and excludes raw protected content and hidden reasoning.
+
+The dashboard is a single-operator local demonstration. It has no authentication, multi-tenancy, scheduling, formal review authority, production policy governance, or clinical/compliance status.

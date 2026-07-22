@@ -215,12 +215,16 @@ class ReviewDecision(BaseModel):
 
 class ReviewQueueItem(BaseModel):
     review_id: str
-    source_type: Literal["audit", "guard_event"]
+    source_type: Literal["audit", "guard_event", "agentic"]
     source_id: str
     scenario_id: str | None = None
+    campaign_id: str | None = None
+    objective_run_id: str | None = None
+    objective_id: str | None = None
     review_reason: str
     policy_categories: list[str]
     automated_dimensions: list[EvaluatorResult] = Field(default_factory=list)
+    agentic_signal_summary: dict[str, int] = Field(default_factory=dict)
     evidence_summary: str
     target_id: str
     timestamp: datetime

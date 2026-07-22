@@ -41,10 +41,28 @@ Browser :3000
        -> demo-agent :8001 and Guard :8002 (server-to-server only)
 ```
 
-## Dependencies and Stage 4 boundary
+## Stage 4: controlled agentic audit plane
+
+`careguard.agentic` owns versioned objectives, safe strategy templates, deterministic and optional model attackers, orchestration, stop conditions, trajectory evaluation, sanitization, atomic evidence writes, reports, comparisons, typed API routes, and CLI coordination. For each objective the runner sends one approved starting message, treats the normalized target response strictly as untrusted data, evaluates it, and either stops or chooses another allowlisted strategy. The browser never performs attacker decisions.
+
+The runner is intentionally in the Audit API process rather than a separate worker. This avoids another service, port, secret boundary, and Docker volume at this stage. It also means execution is synchronous and process-local; cancellation is a persisted cooperative flag, not a worker kill or durable queue. Interrupted queued/running records are recovered as failed.
+
+SQLite contains agentic campaign, objective-run, sanitized turn, comparison, and independent review-decision records. Campaign state plus each objective result and its turns are committed atomically before the result advances. Comparison creation reconciles campaign summaries, objective prefixes, contiguous turns, versions, and final-turn result bindings before accepting evidence. Optional model providers are loopback-only, tool-free, delimiter-safe, and disabled by default.
+
+```text
+Dashboard / CLI
+  -> Audit API :8000
+     -> agentic campaign runner
+        -> deterministic attacker (default) or optional loopback model selector
+        -> demo :8001 or Guard :8002
+        -> deterministic evaluator + optional secondary loopback judge
+        -> SQLite sanitized trajectory / review / report
+```
+
+## Dependencies and future boundary
 
 Shared schemas, catalogs, evidence, and reports live in `careguard`; runtime controls live in `careguard_guard`; intentional target behavior lives in `demo_health_agent`. The Guard imports shared models, while the Audit package includes a Guard connector and comparison helper because both stages ship together. Decoupling the comparison's legacy configuration fallback is minor architectural debt if these become separately deployed packages.
 
 Docker runs Dashboard `3000`, Audit API `8000`, demo agent `8001`, and Guard `8002`, bound to host loopback. Default providers and tools are offline and deterministic.
 
-Stage 4 may add explicitly approved agentic or scheduled regression work, but it must not treat Stage 3's local UI, unauthenticated APIs, SQLite job state, or demonstration review workflow as production identity/governance. Durable identity, authorization, migrations, tamper-evident event storage, secret-vault integration, signed policy governance, and distributed work remain productization requirements.
+Stage 4 does not change the local UI, unauthenticated API, SQLite, or demonstration review workflow into production identity/governance. Durable identity, authorization, migrations, tamper-evident event storage, secret-vault integration, signed policy governance, and distributed work remain future productization requirements.

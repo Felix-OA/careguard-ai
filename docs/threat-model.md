@@ -1,6 +1,6 @@
 # Threat model
 
-This model covers the synthetic, local Stage 1 Audit, Stage 2 Guard, and Stage 3 dashboard. It is not a clinical, privacy, legal, or compliance assessment.
+This model covers the synthetic, local Stage 1 Audit, Stage 2 Guard, Stage 3 dashboard, and Stage 4 controlled agentic runner. It is not a clinical, privacy, legal, or compliance assessment.
 
 ## Assets
 
@@ -10,6 +10,7 @@ This model covers the synthetic, local Stage 1 Audit, Stage 2 Guard, and Stage 3
 - Guard configuration, reason codes, security events, protected raw responses, audit evidence, and reports.
 - Optional connector credentials held in server-side connector state.
 - Organization, target, policy, audit-job, and reviewer-decision metadata in the local dashboard database.
+- Agentic objective definitions, campaign limits, sanitized observations, strategy selections, trajectories, stop reasons, evaluator/judge outcomes, and comparisons.
 
 ## Actors and capabilities
 
@@ -18,6 +19,7 @@ This model covers the synthetic, local Stage 1 Audit, Stage 2 Guard, and Stage 3
 - A claimed staff user can assert authority; only server-supplied role metadata is considered by the demonstration control.
 - An untrusted document author can place indirect instructions in retrieved content.
 - A target or connector can return malformed, unsafe, overconfident, tool-bearing, or secret-shaped output.
+- A malicious synthetic target can try to hijack the attacker using instruction-like text, request environment access, inflate observations, or smuggle reasoning-, secret-, or path-shaped values into evidence.
 - A local operator can change configuration, storage, environment variables, or service mode. A host administrator is trusted and can access local protected files.
 
 Attackers may transform controlled strings, replay or mutate confirmation state, mix multiple policy triggers, manipulate tool arguments, exploit scope changes, or try to confuse raw retrieval with admitted context. Network denial of service, host compromise, and arbitrary code execution are outside this bounded model.
@@ -32,6 +34,8 @@ Attackers may transform controlled strings, replay or mutate confirmation state,
 6. Configuration to runtime: validated configuration controls behavior. Configuration files and reload authority are trusted operational inputs and require deployment access controls outside this repository.
 7. Browser to dashboard aggregation: all browser input is untrusted. nginx same-origin routing reaches only the Audit API; dashboard schemas must remove paths, secrets, protected references, raw authorization metadata, excerpts, and stack traces before rendering.
 8. Dashboard API to configured target: only exact local synthetic origins and allowlisted chat paths are accepted with explicit operator acknowledgement. Redirects are disabled and timeouts/responses are bounded. Production DNS/IP rebinding defenses and egress policy remain out of scope.
+9. Target output to agentic attacker: output is quoted untrusted observation data, size-limited, and sanitized. It cannot add strategies, change campaign limits, invoke tools, or become executable instructions.
+10. Optional model attacker/judge: server-side only, disabled by default, no tools, exact loopback-IP HTTP origin, structured bounded output, sanitized inputs, deterministic fallback, and deterministic severe-finding authority.
 
 ## Modeled threats and controls
 
@@ -44,6 +48,7 @@ Attackers may transform controlled strings, replay or mutate confirmation state,
 - Configuration tampering or invalid reload: schema validation rejects missing controls/mappings and invalid values, but deployment-level file integrity is residual risk.
 - Monitor-mode misunderstanding: monitor intentionally preserves unsafe baseline behavior and is never an enforcement control.
 - Dashboard attacks: stored/reflected HTML, malicious Markdown, path traversal, unbounded queries, arbitrary targets, secret-shaped input, verbose errors, and confusion between automated results and reviewer decisions.
+- Agentic attacks: strategy escape, prompt injection from target output, repeated malformed provider output, hidden-reasoning capture, resource exhaustion, cancellation races, target-path mismatch, scope-mismatched comparisons, and evidence-write failure.
 
 ## Assumptions
 
@@ -67,5 +72,6 @@ Real patients or clinical systems, production authentication/authorization, publ
 - The dashboard is an unauthenticated single-operator local demonstration. Any process or user with loopback/host access may change local target, review, and policy state.
 - The application target allowlist reduces the local demonstration's SSRF surface but cannot provide production network isolation or protect a compromised host.
 - Audit jobs are synchronous and process-local; restart recovery marks unfinished records failed but does not provide leases, distributed locking, cancellation, or exactly-once execution.
+- Agentic campaigns are synchronous and process-local. Cooperative cancellation, bounded target adapters, and restart recovery reduce risk but do not supply worker isolation, hard process preemption, or distributed coordination.
 - Configuration validation does not provide signing, change approval, rollback, or tamper detection.
 - Proxy-only connectors cannot see hidden retrieval or tools that a target does not surface.

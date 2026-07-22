@@ -64,6 +64,37 @@ class PolicySettingRow(Base):
     payload: Mapped[str] = mapped_column(Text)
 
 
+class AgenticCampaignRow(Base):
+    __tablename__ = "agentic_campaigns"
+    campaign_id: Mapped[str] = mapped_column(String, primary_key=True)
+    submitted_at: Mapped[object] = mapped_column(DateTime(timezone=True), index=True)
+    payload: Mapped[str] = mapped_column(Text)
+
+
+class AgenticObjectiveRunRow(Base):
+    __tablename__ = "agentic_objective_runs"
+    objective_run_id: Mapped[str] = mapped_column(String, primary_key=True)
+    campaign_id: Mapped[str] = mapped_column(String, index=True)
+    completed_at: Mapped[object] = mapped_column(DateTime(timezone=True), index=True)
+    payload: Mapped[str] = mapped_column(Text)
+
+
+class AgenticTurnRow(Base):
+    __tablename__ = "agentic_turns"
+    turn_id: Mapped[str] = mapped_column(String, primary_key=True)
+    campaign_id: Mapped[str] = mapped_column(String, index=True)
+    objective_run_id: Mapped[str] = mapped_column(String, index=True)
+    turn_number: Mapped[str] = mapped_column(String)
+    payload: Mapped[str] = mapped_column(Text)
+
+
+class AgenticComparisonRow(Base):
+    __tablename__ = "agentic_comparisons"
+    comparison_id: Mapped[str] = mapped_column(String, primary_key=True)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), index=True)
+    payload: Mapped[str] = mapped_column(Text)
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -216,3 +247,94 @@ class Database:
     def list_policy_setting_payloads(self) -> list[str]:
         with Session(self.engine) as session:
             return [row.payload for row in session.scalars(select(PolicySettingRow)).all()]
+
+    def save_agentic_campaign(self, campaign_id: str, submitted_at: object, payload: str) -> None:
+        with Session(self.engine) as session:
+            session.merge(AgenticCampaignRow(
+                campaign_id=campaign_id, submitted_at=submitted_at, payload=payload,
+            ))
+            session.commit()
+
+    def get_agentic_campaign_payload(self, campaign_id: str) -> str | None:
+        with Session(self.engine) as session:
+            row = session.get(AgenticCampaignRow, campaign_id)
+            return row.payload if row else None
+
+    def list_agentic_campaign_payloads(self) -> list[str]:
+        with Session(self.engine) as session:
+            rows = session.scalars(
+                select(AgenticCampaignRow).order_by(AgenticCampaignRow.submitted_at.desc())
+            ).all()
+            return [row.payload for row in rows]
+
+    def save_agentic_evidence(
+        self,
+        campaign_id: str,
+        submitted_at: object,
+        campaign_payload: str,
+        objective_run_id: str,
+        completed_at: object,
+        objective_payload: str,
+        turn_payloads: dict[str, str],
+    ) -> None:
+        """Atomically persist campaign state, an objective result, and its sanitized turns."""
+        with Session(self.engine) as session:
+            session.merge(AgenticCampaignRow(
+                campaign_id=campaign_id, submitted_at=submitted_at, payload=campaign_payload,
+            ))
+            session.merge(AgenticObjectiveRunRow(
+                objective_run_id=objective_run_id, campaign_id=campaign_id,
+                completed_at=completed_at, payload=objective_payload,
+            ))
+            for turn_id, payload in turn_payloads.items():
+                session.merge(AgenticTurnRow(
+                    turn_id=turn_id, campaign_id=campaign_id,
+                    objective_run_id=objective_run_id, turn_number=turn_id.rsplit(":", 1)[-1],
+                    payload=payload,
+                ))
+            session.commit()
+
+    def list_agentic_objective_payloads(self, campaign_id: str) -> list[str]:
+        with Session(self.engine) as session:
+            rows = session.scalars(
+                select(AgenticObjectiveRunRow)
+                .where(AgenticObjectiveRunRow.campaign_id == campaign_id)
+                .order_by(AgenticObjectiveRunRow.completed_at)
+            ).all()
+            return [row.payload for row in rows]
+
+    def get_agentic_objective_payload(self, objective_run_id: str) -> str | None:
+        with Session(self.engine) as session:
+            row = session.get(AgenticObjectiveRunRow, objective_run_id)
+            return row.payload if row else None
+
+    def list_agentic_turn_payloads(
+        self, campaign_id: str, objective_run_id: str | None = None,
+    ) -> list[str]:
+        with Session(self.engine) as session:
+            query = select(AgenticTurnRow).where(AgenticTurnRow.campaign_id == campaign_id)
+            if objective_run_id:
+                query = query.where(AgenticTurnRow.objective_run_id == objective_run_id)
+            rows = session.scalars(query.order_by(AgenticTurnRow.objective_run_id, AgenticTurnRow.turn_number)).all()
+            return [row.payload for row in rows]
+
+    def save_agentic_comparison(
+        self, comparison_id: str, created_at: object, payload: str,
+    ) -> None:
+        with Session(self.engine) as session:
+            session.merge(AgenticComparisonRow(
+                comparison_id=comparison_id, created_at=created_at, payload=payload,
+            ))
+            session.commit()
+
+    def get_agentic_comparison_payload(self, comparison_id: str) -> str | None:
+        with Session(self.engine) as session:
+            row = session.get(AgenticComparisonRow, comparison_id)
+            return row.payload if row else None
+
+    def list_agentic_comparison_payloads(self) -> list[str]:
+        with Session(self.engine) as session:
+            rows = session.scalars(
+                select(AgenticComparisonRow).order_by(AgenticComparisonRow.created_at.desc())
+            ).all()
+            return [row.payload for row in rows]

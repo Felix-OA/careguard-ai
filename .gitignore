@@ -15,6 +15,10 @@ __pycache__/
 /guard-events/
 /raw-events/
 /reports/generated/
+/reports/agentic/
+/agentic-evidence/
+/agentic-provider-cache/
+/protected-trajectories/
 /local-indexes/
 /tool-state/
 *.key

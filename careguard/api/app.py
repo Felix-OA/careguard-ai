@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from careguard import __version__
+from careguard.agentic.routes import router as agentic_router
 from careguard.audit import AuditRunner
 from careguard.config import load_policy_pack, load_scenario_pack
 from careguard.connectors import DemoConnector, GuardConnector, OpenAICompatibleConnector, RestChatConnector
@@ -24,6 +25,7 @@ from careguard.storage import Database
 
 app = FastAPI(title="CareGuard AI API", version=__version__)
 app.include_router(dashboard_router)
+app.include_router(agentic_router)
 
 
 def data_root() -> Path:

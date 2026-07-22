@@ -4,7 +4,7 @@ CareGuard is for controlled defensive testing. Do not submit real patient data, 
 
 ## Supported scope
 
-Stages 1, 2, and 3 permit localhost and explicit Docker service hosts only. Do not modify the allowlist to test a public or third-party system unless you own it and have written authorization; production targeting is outside this design.
+Stages 1–4 permit localhost and explicit Docker service hosts only. Stage 4 campaigns additionally require a synthetic/authorized acknowledgement and a baseline or Guard target-path match. Public or third-party testing is outside this design.
 
 ## Reporting a vulnerability
 
@@ -20,6 +20,9 @@ Privately report the affected version, reproduction using synthetic data, securi
 - Enforce responses are withheld if the Guard decision cannot be persisted.
 - `.env`, databases, raw evidence, indexes, tool state, and generated reports are ignored.
 - The default provider is deterministic and needs no network access or key.
+- The Stage 4 attacker has no tools, shell, Python, browser, filesystem, Docker, messaging, environment, or arbitrary HTTP capability. It selects an allowlisted strategy and the server generates the message from a safe template.
+- Target output is bounded; secret-, path-, and reasoning-shaped content is removed before persistence; instruction-shaped output is flagged; and repeated invalid optional-model output stops the objective. Optional model attacker/judge traffic is disabled by default and restricted to an exact allowlist of loopback-IP HTTP origins.
+- Agentic evidence commits campaign state, objective outcome, and sanitized turns transactionally. A persistence failure produces a safe failed state; if that state cannot be persisted, the storage exception propagates instead of releasing false success.
 - Dashboard API schemas omit raw prompts/responses, evidence paths, report paths, protected-response references, environment configuration, source excerpts, tool arguments, and raw authorization metadata. Event/report pagination and identifiers are bounded.
 - nginx serves a restrictive Content Security Policy plus `nosniff`, frame denial, referrer, and permissions headers. Markdown is rendered as React text without arbitrary HTML.
 - Target endpoints are validated server-side against exact local synthetic origins and allowlisted chat paths. URL credentials, queries, fragments, redirects, alternate ports, public hosts, and unsupported schemes are rejected; responses and timeouts are bounded. The UI requires an authorization acknowledgement and does not discover or scan targets.
