@@ -46,11 +46,14 @@ class Redaction(BaseModel):
 
 
 class GuardChatRequest(BaseModel):
-    target_id: str = "demo"
-    conversation_id: str
-    request_id: str = Field(default_factory=lambda: f"req-{uuid4().hex}")
-    user_message: str
-    conversation_history: list[ChatTurn] = Field(default_factory=list)
+    target_id: Literal["demo"] = "demo"
+    conversation_id: str = Field(min_length=1, max_length=160, pattern=r"^[A-Za-z0-9:._-]+$")
+    request_id: str = Field(
+        default_factory=lambda: f"req-{uuid4().hex}", min_length=1, max_length=160,
+        pattern=r"^[A-Za-z0-9:._-]+$",
+    )
+    user_message: str = Field(min_length=1, max_length=10_000)
+    conversation_history: list[ChatTurn] = Field(default_factory=list, max_length=50)
     role_metadata: dict[str, str] = Field(default_factory=dict)
     patient_scope_metadata: dict[str, str] = Field(default_factory=dict)
     confirmation_token: str | None = None
@@ -64,7 +67,9 @@ class GuardChatResponse(BaseModel):
     proposed_tool_calls: list[ToolCall] = Field(default_factory=list)
     executed_tool_calls: list[ToolCall] = Field(default_factory=list)
     blocked_tool_calls: list[ToolCall] = Field(default_factory=list)
+    failed_tool_calls: list[ToolCall] = Field(default_factory=list)
     guard_mode: GuardMode
+    guard_config_version: str = "unknown"
     final_decision: Decision
     would_enforce_decision: Decision
     triggered_policies: list[str] = Field(default_factory=list)
@@ -94,6 +99,7 @@ class SecurityEvent(BaseModel):
     conversation_id: str
     request_id: str
     guard_mode: GuardMode
+    guard_config_version: str = "unknown"
     target_id: str
     role_metadata: dict[str, str]
     patient_scope_metadata: dict[str, str]
@@ -102,13 +108,17 @@ class SecurityEvent(BaseModel):
     request_policy_decisions: list[RuleDecision]
     raw_retrieval_metadata: list[SourceMetadata]
     rejected_retrieval_metadata: list[SourceMetadata]
+    refill_context_metadata: list[SourceMetadata] = Field(default_factory=list)
     admitted_context_metadata: list[SourceMetadata]
+    context_refill_performed: bool = False
+    insufficient_trusted_context: bool = False
     raw_target_response_reference: str | None
     final_response: str
     redactions: list[Redaction]
     proposed_tools: list[ToolCall]
     authorized_tools: list[ToolCall]
     blocked_tools: list[ToolCall]
+    failed_tools: list[ToolCall] = Field(default_factory=list)
     executed_tools: list[ToolCall]
     confirmation_status: str
     final_decision: Decision
@@ -118,4 +128,3 @@ class SecurityEvent(BaseModel):
     human_review_required: bool
     latency_ms: float
     error: str | None = None
-

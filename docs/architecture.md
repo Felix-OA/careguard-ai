@@ -1,21 +1,34 @@
 # Architecture
 
-CareGuard has two complementary execution planes.
+CareGuard separates the deliberately imperfect synthetic target from two defensive execution planes.
 
-The **audit plane** loads the fixed policy/scenario catalogs, invokes a normalized target connector, applies deterministic evaluators, writes backward-compatible JSONL evidence, indexes runs in SQLite, and derives audit/comparison reports. Targets `demo` and `demo-guarded` use the same scenario IDs and expected behavior.
+## Stage 1: Audit plane
 
-The **runtime plane** is the separate CareGuard Guard service. Its pipeline is:
+The audit plane loads versioned policies and fixed scenarios, invokes a normalized connector, applies deterministic evaluators, appends sanitized JSONL evidence, indexes run metadata in SQLite, and derives audit/comparison reports. `demo` measures the unchanged baseline endpoint; `demo-guarded` measures the same target through Guard with identical scenario order, versions, expected behavior, and evaluator definitions.
 
-1. Inspect normalized request, history, role, and verified synthetic patient scope.
-2. Fetch raw candidates through the demo’s local-only retrieval hook.
-3. classify candidates as rejected or eligible, refill with trusted candidates when exclusions reduce context, and record every state.
-4. Ask the deterministic target to generate with admitted context while tool execution is disabled.
-5. Inspect/redact or withhold the response.
-6. Authorize proposed tools and apply conversation/action-bound confirmation.
-7. Store a sanitized security event and a protected raw response reference.
+Audit controls score completed scenario evidence. They do not make runtime authorization decisions.
 
-Monitor mode generates through raw target context and permits baseline tool behavior while computing the enforce-mode decisions. Enforce mode applies the guarded context and controls.
+## Stage 2: runtime Guard plane
 
-Docker runs three services: audit API `8000`, demo agent `8001`, and Guard `8002`. All default providers and tools are local and deterministic.
+The separate Guard service sits between its client and the target:
 
-Audit-time testing scores fixed evidence after a scenario. Runtime protection makes and records an immediate decision for each request. Neither is a substitute for qualified review.
+1. Normalize and validate the request.
+2. Inspect policy, role, verified synthetic patient scope, and conversation identity.
+3. Retrieve raw candidates through the demo's restricted deep-integration hook.
+4. Classify candidates, exclude prohibited context, and perform query-relevant trusted refill.
+5. Generate with admitted context and target-side tool execution disabled.
+6. Inspect, redact, withhold, or replace the response.
+7. Classify tool states as proposed, authorized, confirmation-required, confirmed, executed, blocked, or failed.
+8. Persist the protected response and sanitized security decision before releasing enforce output.
+
+Monitor mode uses raw target context and behavior, then records the enforce decision without changing visible traffic. It is observation only and can expose the baseline's intentional weaknesses. Enforce mode applies the guarded context and controls.
+
+The demo's `/chat` endpoint remains the Stage 1 baseline. `/internal/retrieve` and `/internal/generate` are loopback/Compose-only test hooks; they demonstrate the visibility a deep integration needs and are not a production design. A proxy-only integration can inspect only what the target exposes and cannot claim context admission.
+
+## Dependencies and Stage 3 boundary
+
+Shared schemas, catalogs, evidence, and reports live in `careguard`; runtime controls live in `careguard_guard`; intentional target behavior lives in `demo_health_agent`. The Guard imports shared models, while the Audit package includes a Guard connector and comparison helper because both stages ship together. Decoupling the comparison's legacy configuration fallback is minor architectural debt if these become separately deployed packages.
+
+Docker runs Audit API `8000`, demo agent `8001`, and Guard `8002`, bound to host loopback. Default providers and tools are offline and deterministic.
+
+Stage 3 may add scheduling, review workflows, and views over these APIs. Scheduling, policy decisions, evaluation aggregation, and event/report logic must remain in backend services rather than the UI. Stage 3 must also add durable identity, access control, migrations, and production event-store design before any real deployment claim.

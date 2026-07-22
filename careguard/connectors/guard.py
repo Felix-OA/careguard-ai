@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from threading import RLock
 
 import httpx
 
@@ -25,6 +26,7 @@ class GuardConnector(TargetConnector):
             self.pipeline = GuardPipeline(load_guard_config(mode=mode), event_root)
         self._confirmation_tokens: dict[str, str] = {}
         self._patient_scopes: dict[str, dict[str, str]] = {}
+        self._state_lock = RLock()
 
     async def send(self, request: NormalizedRequest) -> NormalizedResponse:
         scope: dict[str, str] = {}
@@ -34,12 +36,16 @@ class GuardConnector(TargetConnector):
         if synthetic_scope and request.role_metadata.get("role") == "patient":
             scope["verified_patient_id"] = synthetic_scope.upper()
             scope["verification"] = "synthetic_audit_adapter"
-            self._patient_scopes[request.conversation_id] = dict(scope)
-        elif request.conversation_id in self._patient_scopes:
-            scope = dict(self._patient_scopes[request.conversation_id])
+            with self._state_lock:
+                self._patient_scopes[request.conversation_id] = dict(scope)
+        else:
+            with self._state_lock:
+                if request.conversation_id in self._patient_scopes:
+                    scope = dict(self._patient_scopes[request.conversation_id])
         token = None
         if "confirm" in request.user_message.lower():
-            token = self._confirmation_tokens.get(request.conversation_id)
+            with self._state_lock:
+                token = self._confirmation_tokens.pop(request.conversation_id, None)
         guard_request = GuardChatRequest(
             target_id="demo",
             conversation_id=request.conversation_id,
@@ -66,18 +72,34 @@ class GuardConnector(TargetConnector):
                     error=f"guard connector error: {type(exc).__name__}",
                 )
         else:
-            guarded = await self.pipeline.process(guard_request)
+            try:
+                guarded = await self.pipeline.process(guard_request)
+            except Exception as exc:
+                return NormalizedResponse(
+                    target_id="demo-guarded", conversation_id=request.conversation_id,
+                    provider="careguard-guard", model="guard-deterministic-v1",
+                    error=f"guard connector error: {type(exc).__name__}",
+                )
         if guarded.confirmation_token:
-            self._confirmation_tokens[request.conversation_id] = guarded.confirmation_token
+            with self._state_lock:
+                self._confirmation_tokens[request.conversation_id] = guarded.confirmation_token
         return NormalizedResponse(
             target_id="demo-guarded",
             conversation_id=request.conversation_id,
             answer=guarded.answer,
             retrieved_sources=guarded.retrieved_sources,
             proposed_tool_calls=guarded.proposed_tool_calls,
+            blocked_tool_calls=guarded.blocked_tool_calls,
+            failed_tool_calls=guarded.failed_tool_calls,
             executed_tool_calls=guarded.executed_tool_calls,
             latency_ms=guarded.latency_ms,
             provider="careguard-guard",
             model="guard-deterministic-v1",
             error=guarded.error,
+            guard_metadata={
+                "guard_mode": guarded.guard_mode.value,
+                "guard_config_version": guarded.guard_config_version,
+                "event_id": guarded.event_id,
+                "final_decision": guarded.final_decision.value,
+            },
         )

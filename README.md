@@ -11,7 +11,7 @@ CareGuard is intended for authorized AI security and application teams. It uses 
 - A separate Guard FastAPI gateway with request, retrieval/context, response, tool, redaction, escalation, and confirmation controls.
 - `monitor` mode that preserves traffic while recording what enforce mode would do.
 - `enforce` mode that applies blocks, context filtering/refill, redaction, policy escalation, tool authorization, and bounded confirmation.
-- Protected raw target responses and structured Guard events with stable reason codes.
+- Protected raw target responses and structured Guard events with stable reason codes and distinct proposed/authorized/confirmed/executed/blocked/failed tool states.
 - Baseline `demo` and guarded `demo-guarded` audits using the identical scenario suite, plus Markdown/JSON comparisons.
 - No paid provider or API key in the default path.
 
@@ -32,7 +32,7 @@ Synthetic demo agent :8001
 CareGuard Audit API :8000 -> baseline or guarded connector -> evidence/reports
 ```
 
-The demo’s `/internal/retrieve` and `/internal/generate` hooks are restricted to local/private network clients and let Guard inspect candidates before generation. The original `/chat` remains the intentionally weak Stage 1 baseline.
+The demo’s `/internal/retrieve` and `/internal/generate` hooks are restricted to loopback, test, and Docker-network clients and let Guard inspect candidates before generation. They are unauthenticated test fixtures, not a recommended production interface. The original `/chat` remains the intentionally weak Stage 1 baseline.
 
 ## Docker setup
 
@@ -53,7 +53,7 @@ docker compose down
 docker compose up --build
 ```
 
-Set `CAREGUARD_GUARD_MODE=monitor` or `enforce` in `.env`. `POST /v1/config/reload` reloads YAML and environment-selected mode inside a running Guard service.
+Set `CAREGUARD_GUARD_MODE=monitor` or `enforce` in `.env`. Monitor observes and intentionally preserves unsafe baseline traffic; it is not protection. `POST /v1/config/reload` reloads validated YAML and the environment-selected mode, and clears process-local confirmation/conversation state.
 
 ## Local CLI workflow
 
@@ -101,13 +101,13 @@ Guard endpoints include `/v1/policies`, `/v1/events`, `/v1/events/{event_id}`, `
 - Protected raw target responses: `.careguard-data/guard/protected/`
 - Comparison reports: `.careguard-data/reports/comparisons/`
 
-These locations are ignored by Git. Public Guard responses never include a protected raw response. Reviewed samples live in `reports/samples/`.
+These locations are ignored by Git. Public Guard responses/events hide raw request text, source excerpts, local paths, protected responses, and tool arguments. Complete sanitized synthetic evidence remains in local protected storage. Reviewed samples live in `reports/samples/`.
 
 ## Integration boundaries
 
 Deep integration exposes retrieval candidates to Guard and supports context admission before generation. An external proxy-only connector can inspect requests, responses, and proposed tools, but it cannot filter model context unless the target supplies an authorized retrieval/generation hook. Audit-time testing replays fixed scenarios and scores evidence; runtime protection evaluates each live local request and records a Guard event.
 
-See the [architecture](docs/architecture.md), [Guard pipeline](docs/guard-pipeline.md), [policy configuration](docs/policy-configuration.md), [tool controls](docs/tool-control.md), [connector guide](docs/connector-guide.md), [threat model](docs/threat-model.md), and [roadmap](docs/product-roadmap.md).
+See the [architecture](docs/architecture.md), [Guard pipeline](docs/guard-pipeline.md), [policy configuration](docs/policy-configuration.md), [policy coverage](docs/policy-coverage.md), [tool controls](docs/tool-control.md), [connector guide](docs/connector-guide.md), [threat model](docs/threat-model.md), [pre-Stage-3 validation](docs/pre-stage-3-validation.md), and [roadmap](docs/product-roadmap.md).
 
 ## Validation
 
@@ -123,6 +123,8 @@ python scripts/smoke_test.py  # after the Compose stack is healthy
 - Controls are transparent deterministic rules, not complete semantic security.
 - Process-local confirmation tokens demonstrate binding and expiry; they are not production authentication.
 - SQLite and local files are development storage, not a distributed security event platform.
+- Client-supplied role/scope metadata demonstrates policy behavior; production identity must be authenticated and server-derived.
+- Message hashes aid correlation/integrity checking and are not anonymization.
 - Generic external connectors lack deep context admission unless they implement the integration hook.
 - Qualified clinical, security, privacy, and legal review remains necessary.
 

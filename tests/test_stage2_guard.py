@@ -68,12 +68,13 @@ def test_confidential_exclusion_untrusted_filter_and_trusted_refill():
     config = load_guard_config()
     candidates = [doc for doc in DOCUMENTS if doc["trust_level"] in {"confidential_synthetic", "untrusted"}]
     refill = [doc for doc in DOCUMENTS if doc["trust_level"].startswith("trusted_")]
-    admitted_docs, raw, rejected, admitted, refilled = guard_retrieval(
+    admitted_docs, raw, rejected, refill_metadata, admitted, refilled = guard_retrieval(
         candidates, request("portal record", "guest"), config, refill
     )
     assert all(item["trust_level"].startswith("trusted_") for item in admitted_docs)
     assert {item.trust_level for item in rejected} == {"confidential_synthetic", "untrusted"}
     assert refilled and len(admitted) == 2
+    assert len(refill_metadata) == 2
     assert any(not item.admitted_to_context for item in raw)
 
 
@@ -139,7 +140,9 @@ def test_expired_and_changed_confirmation_rejected():
     token = store.create("conversation", original, 1, now=now)
     changed = ToolCall(name="book_appointment", arguments={"patient_id": "PAT-CG-2002"})
     assert store.verify(token, "conversation", changed, now=now) == "changed_action"
-    assert store.verify(token, "conversation", original, now=now + timedelta(seconds=2)) == "expired"
+    assert store.verify(token, "conversation", original, now=now + timedelta(seconds=2)) == "missing"
+    expiring = store.create("conversation", original, 1, now=now)
+    assert store.verify(expiring, "conversation", original, now=now + timedelta(seconds=2)) == "expired"
 
 
 def test_event_serialization_and_secret_removal(tmp_path):

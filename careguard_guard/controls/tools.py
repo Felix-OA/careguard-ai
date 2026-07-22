@@ -17,6 +17,7 @@ class ToolGuardResult:
     proposed: list[ToolCall] = field(default_factory=list)
     authorized: list[ToolCall] = field(default_factory=list)
     blocked: list[ToolCall] = field(default_factory=list)
+    failed: list[ToolCall] = field(default_factory=list)
     executed: list[ToolCall] = field(default_factory=list)
     confirmation_status: str = "not_required"
     confirmation_token: str | None = None
@@ -55,9 +56,19 @@ class ToolGuard:
             action_patient = _appointment_patient(call.arguments.get("reference"))
         return action_patient == verified
 
-    def evaluate(self, calls: list[ToolCall], request: GuardChatRequest, execute: bool) -> ToolGuardResult:
+    def evaluate(
+        self, calls: list[ToolCall], request: GuardChatRequest, execute: bool,
+        issue_confirmation: bool = True,
+    ) -> ToolGuardResult:
         result = ToolGuardResult(proposed=list(calls))
         for original in calls:
+            policy_reason = (
+                "CG_HUMAN_REVIEW_REQUIRED"
+                if original.name == "request_clinician_escalation"
+                else "CG_SENSITIVE_ACTION_CONTROLLED"
+            )
+            result.reason_codes.append(policy_reason)
+            result.policy_ids.append(self.config.policy_mappings[policy_reason])
             authorized = self._authorized(original, request)
             call = original.model_copy(update={"authorized": authorized})
             if not authorized:
@@ -67,23 +78,32 @@ class ToolGuard:
                 continue
             result.authorized.append(call)
             if self.config.enabled_controls.get("confirmation", True) and call.name in self.config.confirmation.required_tools:
-                status = self.confirmations.verify(request.confirmation_token, request.conversation_id, call)
+                status = self.confirmations.verify(
+                    request.confirmation_token, request.conversation_id, call,
+                    patient_scope=request.patient_scope_metadata,
+                )
                 if status != "confirmed":
                     result.confirmation_status = status if request.confirmation_token else "required"
                     result.reason_codes.append("CG_TOOL_CONFIRMATION_REQUIRED" if status == "missing" else "CG_CONFIRMATION_INVALID")
                     result.policy_ids.append(self.config.policy_mappings[result.reason_codes[-1]])
-                    result.confirmation_token = self.confirmations.create(
-                        request.conversation_id, call, self.config.confirmation.ttl_seconds
-                    )
+                    if issue_confirmation:
+                        result.confirmation_token = self.confirmations.create(
+                            request.conversation_id, call, self.config.confirmation.ttl_seconds,
+                            patient_scope=request.patient_scope_metadata,
+                        )
                     result.confirmation_summary = self._safe_summary(call)
                     continue
                 result.confirmation_status = "confirmed"
                 call = call.model_copy(update={"confirmed": True})
-            else:
-                call = call.model_copy(update={"confirmed": True})
             if execute:
-                self._execute(call)
-                result.executed.append(call)
+                try:
+                    self._execute(call)
+                except Exception:
+                    result.failed.append(call)
+                    result.reason_codes.append("CG_TOOL_EXECUTION_FAILED")
+                    result.policy_ids.append(self.config.policy_mappings["CG_TOOL_EXECUTION_FAILED"])
+                else:
+                    result.executed.append(call)
         return result
 
     @staticmethod

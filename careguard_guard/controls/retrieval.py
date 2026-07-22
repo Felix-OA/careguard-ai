@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-
 from careguard.models.schemas import SourceMetadata
 from careguard_guard.config import GuardConfig
 from careguard_guard.controls.common import patient_ids, role, verified_patient_id
@@ -43,12 +41,16 @@ def _eligible(doc: dict, request: GuardChatRequest, config: GuardConfig) -> bool
 def guard_retrieval(
     candidates: list[dict], request: GuardChatRequest, config: GuardConfig,
     refill_candidates: list[dict] | None = None, desired_top_k: int = 2,
-) -> tuple[list[dict], list[SourceMetadata], list[SourceMetadata], list[SourceMetadata], bool]:
-    """Return admitted docs plus raw/rejected/admitted metadata and whether refill occurred."""
+) -> tuple[
+    list[dict], list[SourceMetadata], list[SourceMetadata],
+    list[SourceMetadata], list[SourceMetadata], bool,
+]:
+    """Return admitted docs plus raw, rejected, refill, admitted metadata and refill status."""
     raw: list[SourceMetadata] = []
     rejected: list[SourceMetadata] = []
     admitted_docs: list[dict] = []
     seen: set[str] = set()
+    refill_metadata: list[SourceMetadata] = []
     for doc in candidates:
         accepted = _eligible(doc, request, config)
         raw.append(source_metadata(doc, accepted))
@@ -63,11 +65,10 @@ def guard_retrieval(
             if doc["source_id"] in seen or not _eligible(doc, request, config):
                 continue
             admitted_docs.append(doc)
-            raw.append(source_metadata(doc, True))
+            refill_metadata.append(source_metadata(doc, True))
             seen.add(doc["source_id"])
             refilled = True
             if len(admitted_docs) >= desired_top_k:
                 break
     admitted = [source_metadata(doc, True) for doc in admitted_docs]
-    return admitted_docs, raw, rejected, admitted, refilled
-
+    return admitted_docs, raw, rejected, refill_metadata, admitted, refilled

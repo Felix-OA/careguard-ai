@@ -6,6 +6,12 @@ from careguard.models.schemas import SourceMetadata
 from careguard_guard.config import GuardConfig
 from careguard_guard.models import Decision, Redaction, RuleDecision
 
+CERTAINTY_PATTERN = re.compile(
+    r"\b(?:definitely\s+have|guaranteed(?:\s+diagnosis)?|certain(?:ly)?\s+(?:have|diagnosis)|"
+    r"double\s+your\s+dose|take\s+twice|must\s+be\s+diagnosed)\b",
+    re.I,
+)
+
 
 def inspect_response(
     raw_answer: str, admitted: list[SourceMetadata], config: GuardConfig,
@@ -25,13 +31,21 @@ def inspect_response(
                 count=count,
             ))
     lowered = raw_answer.lower()
-    if apply_safety and any(phrase in lowered for phrase in ("definitely have", "guaranteed diagnosis", "double your dose", "take twice")):
+    if apply_safety and CERTAINTY_PATTERN.search(raw_answer):
         rules.append(RuleDecision(
             rule_id="response.unsupported_certainty", matched_category="diagnostic_certainty",
             policy_id=config.policy_mappings["CG_UNSUPPORTED_CERTAINTY"],
             reason_code="CG_UNSUPPORTED_CERTAINTY", decision=Decision.BLOCK, rule_strength="high",
             safe_explanation="The target response contains unsupported certainty language.",
             monitor_action="Record that enforce mode would withhold the response.",
+            enforce_action="withhold the response and use the configured safe fallback",
+        ))
+        rules.append(RuleDecision(
+            rule_id="response.unsupported_medical_claim", matched_category="unsupported_claims",
+            policy_id=config.policy_mappings["CG_UNSUPPORTED_MEDICAL_CLAIM"],
+            reason_code="CG_UNSUPPORTED_MEDICAL_CLAIM", decision=Decision.BLOCK, rule_strength="high",
+            safe_explanation="The target response makes a medical claim without approved grounding.",
+            monitor_action="Record that enforce mode would withhold the unsupported claim.",
             enforce_action="withhold the response and use the configured safe fallback",
         ))
     if apply_safety and "internal_system_rule" in lowered:
@@ -54,7 +68,8 @@ def inspect_response(
             monitor_action="Record that enforce mode would withhold the response.",
             enforce_action="withhold the ungrounded response",
         ))
-    if apply_safety and emergency_required and "emergency services" not in lowered:
+    emergency_support = "emergency services" in lowered or "qualified clinical support" in lowered
+    if apply_safety and emergency_required and (not emergency_support or CERTAINTY_PATTERN.search(raw_answer)):
         rules.append(RuleDecision(
             rule_id="response.emergency_missing", matched_category="emergency_escalation",
             policy_id=config.policy_mappings["CG_EMERGENCY_ESCALATION"],
