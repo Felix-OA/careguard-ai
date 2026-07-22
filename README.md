@@ -1,54 +1,110 @@
 # CareGuard AI
 
-CareGuard AI is a defensive, local-first system for assessing and applying bounded runtime controls to healthcare patient-support and healthcare-information AI applications. Stage 1 provides **Audit**, Stage 2 adds the functional **CareGuard Guard** gateway, Stage 3 adds a working dashboard and local company-onboarding workflow, and Stage 4 adds **controlled multi-turn agentic auditing**. Regression scheduling remains future work.
+**A bounded healthcare AI security audit, runtime guard, and controlled agentic evaluation platform.**
 
-CareGuard is intended for authorized AI security and application teams. It uses only fictional data, provides no diagnosis or personalized treatment, and does not claim HIPAA compliance, clinical validation, regulatory approval, complete prompt-injection prevention, production readiness, or a production security guarantee.
+CareGuard AI is a local, synthetic prototype for evaluating healthcare-specific AI risks, applying observable runtime controls, and comparing baseline and guarded behavior. It gives AI security teams, digital-health builders, and LLM application engineers a reproducible way to inspect retrieval, context, disclosure, source trust, tool use, escalation, and multi-turn behavior without using real patient data or public targets.
 
-## Implemented capabilities
+> **Project status:** Stages 1–4 are implemented and independently hardened for a public technical demonstration. The reviewed suite has 92 backend tests, 20 frontend tests, two end-to-end workflows, and four healthy Docker services. This is not production readiness, clinical validation, regulatory certification, HIPAA compliance, or a universal security guarantee.
 
-- A deliberately imperfect synthetic healthcare target with four local simulated tools.
-- A versioned 15-policy pack, 20 safe scenarios, deterministic evaluators, JSONL evidence, SQLite metadata, reports, API, and CLI.
-- A separate Guard FastAPI gateway with request, retrieval/context, response, tool, redaction, escalation, and confirmation controls.
-- `monitor` mode that preserves traffic while recording what enforce mode would do.
-- `enforce` mode that applies blocks, context filtering/refill, redaction, policy escalation, tool authorization, and bounded confirmation.
-- Protected raw target responses and structured Guard events with stable reason codes and distinct proposed/authorized/confirmed/executed/blocked/failed tool states.
-- Baseline `demo` and guarded `demo-guarded` audits using the identical scenario suite, plus Markdown/JSON comparisons.
-- A React/TypeScript dashboard with server-persisted onboarding, target configuration, audit jobs, comparisons, sanitized Guard events, a separate human-review workflow, policies, safe reports, and a guided synthetic demo.
-- A versioned 10-objective agentic pack, versioned 10-strategy safe template pack, deterministic seeded campaigns, sanitized trajectory evidence, explicit limits/stops, REVIEW routing, and evidence-reconciled baseline-versus-guarded comparison.
-- No paid provider or API key in the default path.
+## Product capabilities
 
-## Architecture
+| Capability | What it does |
+|---|---|
+| **CareGuard Audit** | Runs a versioned suite of healthcare-specific security and safety evaluations and produces deterministic evidence and reports. |
+| **CareGuard Guard** | Applies bounded request, retrieval, context, response, escalation, confirmation, and tool controls in monitor or enforce mode. |
+| **CareGuard Dashboard** | Manages local targets, audits, comparisons, Guard events, human reviews, policies, reports, and the synthetic demonstration. |
+| **Agentic Audit** | Runs controlled multi-turn evaluations using approved objectives, allow-listed strategies, explicit limits, and sanitized trajectories. |
+
+The default path is offline, deterministic, and key-free. It includes a deliberately imperfect fictional healthcare target so baseline weaknesses and guarded behavior can be measured against the same fixed configuration.
+
+## How the parts fit together
 
 ```text
-Client / fixed audit suite
-          |
-          v
-CareGuard Guard :8002
-  request policy -> raw retrieval -> context admission/refill
-  -> deterministic target generation -> response/redaction
-  -> tool authorization/confirmation -> security event
-          |
-          v
-Synthetic demo agent :8001
-
-Browser -> Dashboard :3000 -> same-origin /api -> Audit API :8000
-                                            -> sanitized dashboard aggregation
-                                            -> bounded in-process agentic runner
-                                            -> baseline/guarded evidence and reports
+Browser / client
+       |
+       v
+Dashboard :3000  --->  Audit API :8000  --->  fixed Audit or controlled Agentic Audit
+                              |                         |
+                              |                         v
+                              +----> Guard :8002 ---> synthetic target :8001
+                                             |
+                                             v
+                                  events, evidence, review, reports
 ```
 
-The demo’s `/internal/retrieve` and `/internal/generate` hooks are restricted to loopback, test, and Docker-network clients and let Guard inspect candidates before generation. They are unauthenticated test fixtures, not a recommended production interface. The original `/chat` remains the intentionally weak Stage 1 baseline.
+Audit measures completed behavior. Guard applies runtime controls. The dashboard exposes sanitized, server-derived views. Controlled Agentic Audit adapts across multiple turns while remaining inside server-owned objectives, strategies, targets, and resource limits. See the [public case study](docs/public-case-study.md) and [architecture](docs/architecture.md) for the complete design.
+
+## Reviewed results
+
+### Fixed deterministic audit suite
+
+The same 20-scenario suite was run against the synthetic baseline and guarded paths.
+
+| Outcome | Baseline | Guarded |
+|---|---:|---:|
+| PASS | 6 | 13 |
+| FAIL | 11 | 0 |
+| REVIEW | 3 | 7 |
+
+These are fixed-suite observations, not general security rates. REVIEW remains separate because consequential healthcare wording, authority, and source-trust cases require human judgment.
+
+### Controlled agentic campaign
+
+A matched deterministic campaign used seed `731`, ten objectives, a five-turn objective ceiling, a 50-turn campaign ceiling, and zero model calls.
+
+| Metric | Baseline | Guarded |
+|---|---:|---:|
+| PASS | 1 | 5 |
+| FAIL | 8 | 0 |
+| REVIEW | 1 | 5 |
+| Total turns | 11 | 19 |
+| Answer disclosures | 8 | 0 |
+| Untrusted context admissions | 2 | 0 |
+| Blocked tool attempts | 0 | 2 |
+
+Five guarded REVIEW outcomes are non-directional. The longer guarded trajectories show that boundaries were exercised across more turns in this configuration; they do not prove causation or universal effectiveness. Security and utility are reported separately in the [case study](docs/public-case-study.md).
+
+## Run the local demonstration
+
+Prerequisites are Docker Desktop and Docker Compose. No API key is required.
+
+```bash
+cp .env.example .env
+docker compose up --build --wait
+```
+
+Open <http://127.0.0.1:3000>. The [public demo guide](docs/public-demo-guide.md) walks through onboarding, baseline and guarded audits, comparisons, Guard events, REVIEW decisions, and agentic campaigns.
+
+## Screenshots
+
+| Dashboard | Fixed-suite comparison | Agentic comparison |
+|---|---|---|
+| ![CareGuard dashboard overview](docs/screenshots/01-dashboard-overview.png) | ![Baseline-versus-guarded fixed-suite comparison](docs/screenshots/04-fixed-comparison.png) | ![Controlled agentic comparison](docs/screenshots/10-agentic-comparison.png) |
+
+All captures come from the local fictional-data environment. See the [screenshot catalogue](docs/screenshots/README.md) for the complete set.
+
+## Important limitations
+
+- The target, identities, records, documents, and tools are synthetic and scripted.
+- Evaluators use deterministic indicators over fixed scenarios and objectives.
+- The local dashboard has no production authentication, authorization, or multi-tenancy.
+- SQLite, local files, and process-local jobs are demonstration infrastructure.
+- Optional model attacker and judge paths are disabled by default and have not been live-tested against a real local provider.
+- Human REVIEW outcomes are unresolved until assessed by qualified reviewers.
+- CareGuard does not establish clinical safety, compliance, complete prompt-injection prevention, or production security.
+
+Use CareGuard only for authorized defensive testing with fictional data. A company-specific pilot requires architecture discovery, policy and identity mapping, authorized connector work, false-positive tuning, and independent validation; see the [company pilot framework](docs/company-pilot.md).
 
 ## Docker setup
 
 ```bash
 cp .env.example .env
-docker compose up --build
+docker compose up --build --wait
 ```
 
-- Audit API: <http://localhost:8000/docs>
-- Synthetic demo agent: <http://localhost:8001/docs>
-- Guard gateway: <http://localhost:8002/docs>
+- Audit API: <http://127.0.0.1:8000/docs>
+- Synthetic demo agent: <http://127.0.0.1:8001/docs>
+- Guard gateway: <http://127.0.0.1:8002/docs>
 - Dashboard: <http://127.0.0.1:3000>
 - Health endpoints: `:8000/health`, `:8001/health`, and `:8002/health`
 
@@ -76,8 +132,8 @@ python -m pip install -e '.[dev]'
 python -m careguard.cli check-config
 python -m careguard.cli run-audit --target demo
 python -m careguard.cli run-audit --target demo-guarded
-python -m careguard.cli compare-audits --baseline <baseline_run_id> --guarded <guarded_run_id>
-python -m careguard.cli generate-report --run-id <run_id>
+python -m careguard.cli compare-audits --baseline BASELINE_RUN_ID --guarded GUARDED_RUN_ID
+python -m careguard.cli generate-report --run-id RUN_ID
 python -m careguard.cli list-agentic-objectives
 python -m careguard.cli run-agentic-campaign --target demo --objectives healthcare-safe --attacker deterministic --max-turns 5 --seed 42
 python -m careguard.cli run-agentic-campaign --target demo-guarded --objectives healthcare-safe --attacker deterministic --max-turns 5 --seed 42
@@ -118,7 +174,7 @@ Guard endpoints include `/v1/policies`, `/v1/events`, `/v1/events/{event_id}`, `
 - Comparison reports: `.careguard-data/reports/comparisons/`
 - Agentic campaigns, objective runs, sanitized turns, comparisons, and reviews: `.careguard-data/careguard.db`
 
-These locations are ignored by Git. Public Guard responses/events hide raw request text, source excerpts, local paths, protected responses, and tool arguments. Complete sanitized synthetic evidence remains in local protected storage. Reviewed samples live in `reports/samples/`.
+These locations are ignored by Git. Public Guard responses/events hide raw request text, source excerpts, local paths, protected responses, and tool arguments. Complete sanitized synthetic evidence remains in local protected storage. Public illustrative summaries live in [`docs/samples/`](docs/samples/README.md); they are authored summaries rather than copies of raw evidence.
 
 ## Integration boundaries
 
