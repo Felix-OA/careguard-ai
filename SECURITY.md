@@ -14,8 +14,11 @@ Privately report the affected version, reproduction using synthetic data, securi
 
 - Connector credentials remain server-side and are not part of normalized evidence models.
 - Evidence serialization redacts authorization/secret-like keys and common bearer/key patterns.
-- Guard events apply the same sanitizer; protected raw target responses are referenced rather than returned publicly.
-- Deep demo integration endpoints reject non-private network clients.
-- Confirmation state is short-lived, conversation/action-bound, and explicitly not production authentication.
+- Guard events apply the same sanitizer; public event views remove request text, excerpts, scope values, and tool arguments, while protected raw target responses use opaque references.
+- Deep demo integration endpoints accept only loopback, test clients, and the Compose subnet. They are unauthenticated fixtures and are not a production integration pattern.
+- Confirmation state is one-time, short-lived, conversation/action/argument/patient-scope-bound, and explicitly not production authentication.
+- Enforce responses are withheld if the Guard decision cannot be persisted.
 - `.env`, databases, raw evidence, indexes, tool state, and generated reports are ignored.
 - The default provider is deterministic and needs no network access or key.
+
+`normalized_message_hash` supports local correlation/integrity checks. It does not anonymize input and must be handled as potentially sensitive metadata. Monitor mode preserves unsafe target behavior and must not be treated as an enforcement boundary.

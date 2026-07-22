@@ -77,6 +77,23 @@ def inspect_request(request: GuardChatRequest, config: GuardConfig) -> list[Rule
             config, "request.diagnostic_certainty", "diagnostic_certainty", "CG_UNSUPPORTED_CERTAINTY",
             Decision.ALLOW_WITH_WARNING, "medium", "The request asks for unsupported diagnostic certainty.", "inspect and potentially withhold the response",
         ))
+        decisions.append(_rule(
+            config, "request.unsupported_medical_claim", "unsupported_claims", "CG_UNSUPPORTED_MEDICAL_CLAIM",
+            Decision.ALLOW_WITH_WARNING, "medium", "The request seeks a medical claim not supported by approved context.",
+            "inspect grounding and potentially withhold the response",
+        ))
+    if any(phrase in lowered for phrase in ("double my medicine", "double my dose", "personal instruction", "take twice")):
+        decisions.append(_rule(
+            config, "request.medication_boundary", "medication_information", "CG_MEDICATION_BOUNDARY",
+            Decision.ALLOW_WITH_WARNING, "high", "The request seeks a personalized medication direction.",
+            "allow only a non-personalized boundary response and qualified support referral",
+        ))
+    if "update" in lowered and any(term in lowered for term in ("record", "case note")):
+        decisions.append(_rule(
+            config, "request.sensitive_record_action", "sensitive_actions", "CG_SENSITIVE_ACTION_CONTROLLED",
+            Decision.BLOCK, "high", "The request attempts a consequential synthetic record action through chat.",
+            "block and require an authorized record workflow",
+        ))
     emergency = config.enabled_controls.get("emergency_escalation", True) and config.emergency_escalation.enabled and any(
         indicator.lower() in lowered for indicator in config.emergency_escalation.indicators
     )

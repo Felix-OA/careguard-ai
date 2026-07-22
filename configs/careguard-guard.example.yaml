@@ -1,4 +1,4 @@
-version: "1.0"
+version: "1.1"
 guard_mode: enforce
 enabled_controls:
   request_guard: true
@@ -24,6 +24,12 @@ policy_mappings:
   CG_CANARY_EXTRACTION_REQUEST: CG-CONF-001
   CG_CONFIRMATION_INVALID: CG-TOOL-001
   CG_TRUSTED_CONTEXT_REFILLED: CG-SOURCE-001
+  CG_IDENTITY_CONTEXT_CHANGED: CG-AUTH-001
+  CG_UNSUPPORTED_MEDICAL_CLAIM: CG-CLAIM-001
+  CG_MEDICATION_BOUNDARY: CG-MED-001
+  CG_HUMAN_REVIEW_REQUIRED: CG-REVIEW-001
+  CG_SENSITIVE_ACTION_CONTROLLED: CG-ACTION-001
+  CG_TOOL_EXECUTION_FAILED: CG-ACTION-001
 role_permissions:
   guest: [public_information]
   patient: [public_information, own_record, own_appointment, clinician_escalation]
@@ -41,7 +47,7 @@ trusted_source_types: [trusted_clinical, trusted_operational]
 prohibited_context_types: [confidential_synthetic, untrusted]
 redaction_patterns:
   - {pattern_id: exact_canary, pattern: '(?i)SYN-CANARY-CG-ALPHA-731', replacement: '[REDACTED_SYNTHETIC_CANARY]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
-  - {pattern_id: transformed_canary, pattern: '(?i)SYNCANARYCGALPHA731', replacement: '[REDACTED_SYNTHETIC_CANARY]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
+  - {pattern_id: transformed_canary, pattern: '(?i)S[^A-Z0-9]*Y[^A-Z0-9]*N[^A-Z0-9]*C[^A-Z0-9]*A[^A-Z0-9]*N[^A-Z0-9]*A[^A-Z0-9]*R[^A-Z0-9]*Y[^A-Z0-9]*C[^A-Z0-9]*G[^A-Z0-9]*A[^A-Z0-9]*L[^A-Z0-9]*P[^A-Z0-9]*H[^A-Z0-9]*A[^A-Z0-9]*7[^A-Z0-9]*3[^A-Z0-9]*1', replacement: '[REDACTED_SYNTHETIC_CANARY]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
   - {pattern_id: synthetic_email, pattern: '(?i)[a-z0-9._%+-]+@example\.test', replacement: '[REDACTED_SYNTHETIC_EMAIL]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
   - {pattern_id: patient_id, pattern: '(?i)\bPAT-CG-\d{4}\b', replacement: '[REDACTED_SYNTHETIC_PATIENT_ID]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
   - {pattern_id: appointment_reference, pattern: '(?i)\bAPPT-CG-[A-Z0-9-]+\b', replacement: '[REDACTED_SYNTHETIC_APPOINTMENT]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
@@ -55,7 +61,7 @@ emergency_escalation:
   require_human_review: true
   propose_clinician_escalation: true
 confirmation:
-  required_tools: [book_appointment]
+  required_tools: [book_appointment, request_clinician_escalation]
   ttl_seconds: 300
 events:
   retention_days: 30

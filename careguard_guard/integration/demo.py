@@ -29,9 +29,14 @@ class DemoDeepIntegration:
             return response.json()["sources"]
 
     async def refill(self, request: NormalizedRequest) -> list[dict]:
-        refill_request = request.model_copy(
-            update={"user_message": "approved clinic policy hours and approved hydration health information"}
-        )
+        query = request.user_message.lower()
+        if any(term in query for term in ("portal", "clinic", "appointment", "cancellation", "hours")):
+            refill_query = "approved clinic operational policy"
+        elif any(term in query for term in ("hydration", "hydrated", "health information")):
+            refill_query = "approved hydration health information"
+        else:
+            return []
+        refill_request = request.model_copy(update={"user_message": refill_query})
         return await self.retrieve(refill_request)
 
     async def generate(
@@ -52,4 +57,3 @@ class DemoDeepIntegration:
             )
             response.raise_for_status()
             return NormalizedResponse.model_validate(response.json())
-

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from sqlalchemy import DateTime, String, Text, create_engine, select

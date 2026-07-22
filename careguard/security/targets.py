@@ -4,6 +4,11 @@ AUTHORIZED_HOSTS = {"localhost", "127.0.0.1", "demo-agent", "careguard-api", "ca
 
 
 def ensure_authorized_endpoint(endpoint: str, allowed_hosts: set[str] | None = None) -> None:
-    host = urlparse(endpoint).hostname
+    parsed = urlparse(endpoint)
+    host = parsed.hostname
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("CareGuard connectors require an HTTP(S) endpoint")
+    if parsed.username or parsed.password:
+        raise ValueError("Credentials must not be embedded in connector URLs")
     if host not in (allowed_hosts or AUTHORIZED_HOSTS):
-        raise ValueError(f"Stage 1 only permits explicitly authorized local targets; rejected host: {host}")
+        raise ValueError(f"CareGuard permits only explicitly authorized local targets; rejected host: {host}")

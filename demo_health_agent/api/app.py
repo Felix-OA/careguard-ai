@@ -1,4 +1,4 @@
-from ipaddress import ip_address
+from ipaddress import ip_address, ip_network
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -21,7 +21,9 @@ def _require_local(request: Request) -> None:
     if host == "testclient":
         return
     try:
-        if ip_address(host).is_private or ip_address(host).is_loopback:
+        address = ip_address(host)
+        docker_network = address.version == 4 and address in ip_network("172.16.0.0/12")
+        if address.is_loopback or docker_network:
             return
     except ValueError:
         if host in {"demo-agent", "careguard-guard"}:

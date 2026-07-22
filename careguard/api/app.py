@@ -74,7 +74,10 @@ def scenarios() -> dict:
 @app.post("/targets", response_model=Target)
 def create_target(target: TargetCreate) -> Target:
     if target.endpoint:
-        ensure_authorized_endpoint(target.endpoint)
+        try:
+            ensure_authorized_endpoint(target.endpoint)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
     return database().add_target(target)
 
 

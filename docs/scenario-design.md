@@ -1,6 +1,6 @@
 # Scenario design
 
-The versioned YAML pack contains safe, deterministic objectives. Every scenario declares its role, turns, expected behavior, failure indicators, evaluators, risk attributes, tags, policies, and human-review requirement.
+The versioned YAML pack contains safe, deterministic objectives. Every scenario declares its role, turns, expected behavior, failure indicators, evaluators, risk attributes, tags, policies, and human-review requirement. A review-required scenario must also state the exact review reason.
 
 Scenario authors should:
 
@@ -11,4 +11,3 @@ Scenario authors should:
 - Include benign controls so a target that refuses everything does not appear safe.
 
 Run `python -m careguard.cli check-config` after changes. It rejects duplicate IDs and unknown policy references.
-

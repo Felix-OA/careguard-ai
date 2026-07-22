@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -9,7 +10,7 @@ from sqlalchemy import DateTime, String, Text, create_engine, delete, func, sele
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from careguard.evidence import sanitize_for_evidence
-from careguard.models.schemas import NormalizedResponse
+from careguard.models.schemas import NormalizedResponse, ToolCall
 from careguard_guard.config import EventSettings
 from careguard_guard.models import SecurityEvent
 
@@ -33,15 +34,28 @@ class GuardEventStore:
         self.protected = root / "protected"
         self.protected.mkdir(parents=True, exist_ok=True)
         root.mkdir(parents=True, exist_ok=True)
-        self.engine = create_engine(f"sqlite:///{root / 'guard-events.db'}")
+        root.chmod(0o700)
+        self.protected.chmod(0o700)
+        database_path = root / "guard-events.db"
+        self.engine = create_engine(f"sqlite:///{database_path}")
         Base.metadata.create_all(self.engine)
+        database_path.chmod(0o600)
 
     def protect_raw_response(self, event_id: str, response: NormalizedResponse) -> str:
         path = self.protected / f"{event_id}.json"
+        temporary_path = self.protected / f".{event_id}.tmp"
         payload = sanitize_for_evidence(response.model_dump(mode="json"))
-        path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
+        with temporary_path.open("w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, sort_keys=True))
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary_path.chmod(0o600)
+        temporary_path.replace(path)
         path.chmod(0o600)
-        return str(path)
+        return f"protected://guard-response/{event_id}"
+
+    def delete_protected(self, event_id: str) -> None:
+        (self.protected / f"{event_id}.json").unlink(missing_ok=True)
 
     def save(self, event: SecurityEvent) -> SecurityEvent:
         sanitized = SecurityEvent.model_validate(sanitize_for_evidence(event.model_dump(mode="json")))
@@ -66,6 +80,33 @@ class GuardEventStore:
         with Session(self.engine) as session:
             rows = session.scalars(select(EventRow).order_by(EventRow.timestamp.desc()).limit(limit)).all()
             return [SecurityEvent.model_validate_json(row.payload) for row in rows]
+
+    @staticmethod
+    def public_event(event: SecurityEvent) -> SecurityEvent:
+        def without_excerpts(items: list) -> list:
+            return [item.model_copy(update={"excerpt": None}) for item in items]
+
+        def without_arguments(items: list[ToolCall]) -> list[ToolCall]:
+            return [item.model_copy(update={
+                "arguments": {key: "[REDACTED]" for key in item.arguments}
+            }) for item in items]
+
+        return event.model_copy(update={
+            "original_user_message": "[REDACTED_FROM_PUBLIC_EVENT]",
+            "role_metadata": {"role": event.role_metadata.get("role", "unknown")},
+            "patient_scope_metadata": {
+                key: "[REDACTED]" for key in event.patient_scope_metadata
+            },
+            "raw_retrieval_metadata": without_excerpts(event.raw_retrieval_metadata),
+            "rejected_retrieval_metadata": without_excerpts(event.rejected_retrieval_metadata),
+            "refill_context_metadata": without_excerpts(event.refill_context_metadata),
+            "admitted_context_metadata": without_excerpts(event.admitted_context_metadata),
+            "proposed_tools": without_arguments(event.proposed_tools),
+            "authorized_tools": without_arguments(event.authorized_tools),
+            "blocked_tools": without_arguments(event.blocked_tools),
+            "failed_tools": without_arguments(event.failed_tools),
+            "executed_tools": without_arguments(event.executed_tools),
+        })
 
     def metrics(self) -> dict:
         with Session(self.engine) as session:
