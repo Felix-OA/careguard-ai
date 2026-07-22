@@ -20,3 +20,10 @@ __pycache__/
 *.key
 *.pem
 .DS_Store
+node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/.vite/
+*.tsbuildinfo

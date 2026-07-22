@@ -8,4 +8,6 @@ Environment variable `CAREGUARD_GUARD_MODE=monitor|enforce` overrides the file m
 
 Stable reason codes are evidence interfaces. Add new codes with a healthcare policy mapping and tests; do not repurpose an existing code to mean a different decision.
 
-Configuration version is copied into Guard responses, evidence, and comparisons. Validation is not configuration signing or change approval; deployment access control, integrity monitoring, history, and rollback remain Stage 3/production concerns. See [policy coverage](policy-coverage.md).
+Configuration version is copied into Guard responses, evidence, and comparisons. Stage 3 also records local policy enablement with an immutable policy ID, a generated configuration version, and a timestamp. The backend validates every requested ID and derives reason/scenario/control coverage; the frontend cannot invent mappings or rewrite IDs.
+
+Validation is not configuration signing or change approval. Deployment access control, dependency validation beyond the current fixed pack, integrity monitoring, history, rollback, approvals, and signed governance remain production concerns. See [policy coverage](policy-coverage.md).

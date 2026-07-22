@@ -51,6 +51,19 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  careguard-dashboard:
+    build:
+      context: ./frontend
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      careguard-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   careguard-data:

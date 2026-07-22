@@ -20,7 +20,12 @@ class AuditRunner:
         self.connector = connector
         self.evidence_store = EvidenceStore(evidence_directory)
 
-    async def run(self, target_id: str = "demo", scenario_ids: list[str] | None = None) -> AuditSummary:
+    async def run(
+        self,
+        target_id: str = "demo",
+        scenario_ids: list[str] | None = None,
+        policy_version: str | None = None,
+    ) -> AuditSummary:
         policy_pack = load_policy_pack()
         scenario_pack = load_scenario_pack()
         scenarios = [item for item in scenario_pack.scenarios if item.enabled]
@@ -34,7 +39,9 @@ class AuditRunner:
         run_id = f"cg-{started.strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
         counts: Counter[str] = Counter({result.value: 0 for result in Result})
         for scenario in scenarios:
-            record = await self._run_scenario(run_id, target_id, scenario, scenario_pack.version, policy_pack.version)
+            record = await self._run_scenario(
+                run_id, target_id, scenario, scenario_pack.version, policy_version or policy_pack.version,
+            )
             self.evidence_store.write(record)
             counts[record.final_result.value] += 1
         completed = datetime.now(timezone.utc)

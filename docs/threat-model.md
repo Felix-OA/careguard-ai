@@ -1,6 +1,6 @@
 # Threat model
 
-This model covers the synthetic, local Stage 1 Audit and Stage 2 Guard implementation. It is not a clinical, privacy, legal, or compliance assessment.
+This model covers the synthetic, local Stage 1 Audit, Stage 2 Guard, and Stage 3 dashboard. It is not a clinical, privacy, legal, or compliance assessment.
 
 ## Assets
 
@@ -9,6 +9,7 @@ This model covers the synthetic, local Stage 1 Audit and Stage 2 Guard implement
 - Simulated tool proposals, authorization decisions, confirmations, and tool state.
 - Guard configuration, reason codes, security events, protected raw responses, audit evidence, and reports.
 - Optional connector credentials held in server-side connector state.
+- Organization, target, policy, audit-job, and reviewer-decision metadata in the local dashboard database.
 
 ## Actors and capabilities
 
@@ -29,6 +30,8 @@ Attackers may transform controlled strings, replay or mutate confirmation state,
 4. Model proposal to tool execution: proposal, authorization, confirmation, execution, failure, and blocking are separate states.
 5. Runtime to storage/reporting: events and evidence are sanitized, permissions are restricted, and protected responses remain local. Storage success is required before an enforce response is released.
 6. Configuration to runtime: validated configuration controls behavior. Configuration files and reload authority are trusted operational inputs and require deployment access controls outside this repository.
+7. Browser to dashboard aggregation: all browser input is untrusted. nginx same-origin routing reaches only the Audit API; dashboard schemas must remove paths, secrets, protected references, raw authorization metadata, excerpts, and stack traces before rendering.
+8. Dashboard API to configured target: only exact local synthetic origins and allowlisted chat paths are accepted with explicit operator acknowledgement. Redirects are disabled and timeouts/responses are bounded. Production DNS/IP rebinding defenses and egress policy remain out of scope.
 
 ## Modeled threats and controls
 
@@ -40,6 +43,7 @@ Attackers may transform controlled strings, replay or mutate confirmation state,
 - External connector overclaiming: proxy-only integrations cannot enforce context admission without an authorized retrieval/generation boundary.
 - Configuration tampering or invalid reload: schema validation rejects missing controls/mappings and invalid values, but deployment-level file integrity is residual risk.
 - Monitor-mode misunderstanding: monitor intentionally preserves unsafe baseline behavior and is never an enforcement control.
+- Dashboard attacks: stored/reflected HTML, malicious Markdown, path traversal, unbounded queries, arbitrary targets, secret-shaped input, verbose errors, and confusion between automated results and reviewer decisions.
 
 ## Assumptions
 
@@ -60,5 +64,8 @@ Real patients or clinical systems, production authentication/authorization, publ
 - Public event metadata is minimized, but local event and protected-response stores intentionally retain sanitized synthetic evidence and remain sensitive to host access.
 - The message hash supports deterministic correlation/integrity checks; it is not anonymization and can be vulnerable to guessing for low-entropy messages.
 - The event store and SQLite indexes are single-node development components without production audit-log immutability, encryption, distributed locking, or access control.
+- The dashboard is an unauthenticated single-operator local demonstration. Any process or user with loopback/host access may change local target, review, and policy state.
+- The application target allowlist reduces the local demonstration's SSRF surface but cannot provide production network isolation or protect a compromised host.
+- Audit jobs are synchronous and process-local; restart recovery marks unfinished records failed but does not provide leases, distributed locking, cancellation, or exactly-once execution.
 - Configuration validation does not provide signing, change approval, rollback, or tamper detection.
 - Proxy-only connectors cannot see hidden retrieval or tools that a target does not surface.

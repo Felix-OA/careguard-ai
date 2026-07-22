@@ -25,10 +25,26 @@ Monitor mode uses raw target context and behavior, then records the enforce deci
 
 The demo's `/chat` endpoint remains the Stage 1 baseline. `/internal/retrieve` and `/internal/generate` are loopback/Compose-only test hooks; they demonstrate the visibility a deep integration needs and are not a production design. A proxy-only integration can inspect only what the target exposes and cannot claim context admission.
 
-## Dependencies and Stage 3 boundary
+## Stage 3: dashboard plane
+
+The React/TypeScript application is a presentation client, not a security decision engine. In Docker, nginx serves it on loopback port `3000` and proxies same-origin `/api/` requests only to the Audit API. The browser does not combine Guard, demo-agent, evidence, or environment data.
+
+The Audit API's `careguard.dashboard` package is the sanitized aggregation boundary. Explicit Pydantic models expose organization state, target capability and credential status, audit-job state, path-free audit/comparison summaries, protected-content-free finding details, paginated public Guard events, independent review decisions, policy coverage, safe report summaries, health, and evidence-validated dashboard summaries. SQLite remains authoritative for local onboarding, configuration, job, and review records. Jobs run synchronously in-process but persist honest queued/running/completed/failed transitions, recover interrupted active records as failed, and do not fabricate progress. This is not a durable queue.
+
+Dashboard policy enablement is a local audit-scope configuration, not Guard policy governance. Updates are transactional and monotonically versioned; future dashboard audit evidence binds the effective version. Comparisons reject different scenario, policy, product, expected-behavior, evaluator, or ordering scope.
+
+```text
+Browser :3000
+  -> nginx /api/*
+    -> Audit API :8000
+       -> dashboard aggregation -> SQLite / sanitized evidence / public events
+       -> demo-agent :8001 and Guard :8002 (server-to-server only)
+```
+
+## Dependencies and Stage 4 boundary
 
 Shared schemas, catalogs, evidence, and reports live in `careguard`; runtime controls live in `careguard_guard`; intentional target behavior lives in `demo_health_agent`. The Guard imports shared models, while the Audit package includes a Guard connector and comparison helper because both stages ship together. Decoupling the comparison's legacy configuration fallback is minor architectural debt if these become separately deployed packages.
 
-Docker runs Audit API `8000`, demo agent `8001`, and Guard `8002`, bound to host loopback. Default providers and tools are offline and deterministic.
+Docker runs Dashboard `3000`, Audit API `8000`, demo agent `8001`, and Guard `8002`, bound to host loopback. Default providers and tools are offline and deterministic.
 
-Stage 3 may add scheduling, review workflows, and views over these APIs. Scheduling, policy decisions, evaluation aggregation, and event/report logic must remain in backend services rather than the UI. Stage 3 must also add durable identity, access control, migrations, and production event-store design before any real deployment claim.
+Stage 4 may add explicitly approved agentic or scheduled regression work, but it must not treat Stage 3's local UI, unauthenticated APIs, SQLite job state, or demonstration review workflow as production identity/governance. Durable identity, authorization, migrations, tamper-evident event storage, secret-vault integration, signed policy governance, and distributed work remain productization requirements.

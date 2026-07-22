@@ -72,3 +72,7 @@ There are no remaining guarded FAIL results. The seven REVIEW outcomes are catal
 All 15 policies map to scenarios, controls/reason codes, or evaluator evidence; see [policy coverage](policy-coverage.md). Direct unit coverage exists for insurance references, fixture names, poison markers, tool failure, persistence failure, and state mutation without increasing the 20-scenario suite.
 
 No fixed-suite utility regression or benign-control false positive was observed after hardening. This result is bounded to exact deterministic inputs. Pattern matching, client-supplied demo identity metadata, process-local confirmation, local unauthenticated APIs, SQLite/filesystem storage, proxy-only visibility, and lack of configuration signing remain explicit limitations.
+
+## Stage 3 implementation note
+
+Stage 3 builds on, rather than revises, this validated evidence baseline. The reviewed fixed-suite counts remain 6/0/11/3 baseline and 13/0/0/7 guarded; the seven guarded REVIEW outcomes remain first-class dashboard and reviewer-queue entries. Dashboard review decisions are stored separately and never rewrite the automated result. This document remains the pre-Stage-3 backend record; current dashboard validation belongs in the Stage 3 test and delivery results.
