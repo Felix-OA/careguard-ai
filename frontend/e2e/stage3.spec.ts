@@ -85,5 +85,5 @@ test('completes the local synthetic Stage 3 workflow', async ({ page }) => {
 
   await page.goto('/settings')
   await expect(page.getByRole('heading', { name: 'System and limitations' })).toBeVisible()
-  await expect(page.getByText('Stage 3 boundaries')).toBeVisible()
+  await expect(page.getByText('Stage 4 boundaries')).toBeVisible()
 })

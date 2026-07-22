@@ -22,6 +22,12 @@ const ReportsPage = lazy(() => import('../pages/ReportsPage').then(module => ({ 
 const ReportDetailPage = lazy(() => import('../pages/ReportsPage').then(module => ({ default: module.ReportDetailPage })))
 const DemoPage = lazy(() => import('../pages/DemoPage').then(module => ({ default: module.DemoPage })))
 const SettingsPage = lazy(() => import('../pages/SettingsPage').then(module => ({ default: module.SettingsPage })))
+const AgenticPage = lazy(() => import('../pages/AgenticPage').then(module => ({ default: module.AgenticPage })))
+const AgenticNewPage = lazy(() => import('../pages/AgenticPage').then(module => ({ default: module.AgenticNewPage })))
+const AgenticDetailPage = lazy(() => import('../pages/AgenticPage').then(module => ({ default: module.AgenticDetailPage })))
+const AgenticTrajectoryPage = lazy(() => import('../pages/AgenticPage').then(module => ({ default: module.AgenticTrajectoryPage })))
+const AgenticComparisonPage = lazy(() => import('../pages/AgenticPage').then(module => ({ default: module.AgenticComparisonPage })))
+const AgenticReportPage = lazy(() => import('../pages/AgenticPage').then(module => ({ default: module.AgenticReportPage })))
 
 export function App() {
   return <ErrorBoundary><Suspense fallback={<Loading />}><Routes><Route element={<Shell />}>
@@ -32,6 +38,9 @@ export function App() {
     <Route path="comparisons" element={<ComparisonsPage />} /><Route path="comparisons/:comparisonId" element={<ComparisonDetailPage />} />
     <Route path="events" element={<EventsPage />} /><Route path="events/:eventId" element={<EventDetailPage />} />
     <Route path="reviews" element={<ReviewsPage />} />
+    <Route path="agentic" element={<AgenticPage />} /><Route path="agentic/new" element={<AgenticNewPage />} />
+    <Route path="agentic/:campaignId" element={<AgenticDetailPage />} /><Route path="agentic/:campaignId/objectives/:objectiveRunId" element={<AgenticTrajectoryPage />} /><Route path="agentic/:campaignId/report" element={<AgenticReportPage />} />
+    <Route path="agentic/comparisons/:comparisonId" element={<AgenticComparisonPage />} /><Route path="agentic/comparisons/:comparisonId/report" element={<AgenticReportPage />} />
     <Route path="policies" element={<PoliciesPage />} /><Route path="policies/:policyId" element={<PolicyDetailPage />} />
     <Route path="reports" element={<ReportsPage />} /><Route path="reports/:reportType/:reportId" element={<ReportDetailPage />} />
     <Route path="demo" element={<DemoPage />} /><Route path="settings" element={<SettingsPage />} />

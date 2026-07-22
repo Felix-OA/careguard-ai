@@ -460,6 +460,9 @@ class DashboardService:
         return ReviewDecision(review_id=review_id, status=ReviewStatus.UNREVIEWED)
 
     async def review_queue(self) -> list[ReviewQueueItem]:
+        from careguard.agentic.models import AgenticCampaign, AgenticOutcome, ObjectiveRun
+        from careguard.agentic.objectives import load_objective_pack
+
         scenarios = {item.scenario_id: item for item in load_scenario_pack().scenarios}
         policy_categories = {item.policy_id: item.category for item in load_policy_pack().policies}
         items: list[ReviewQueueItem] = []
@@ -493,6 +496,49 @@ class DashboardService:
                     automated_result=record.final_result.value,
                     is_stale=superseded_by is not None,
                     superseded_by=superseded_by,
+                    decision=self._review_decision(review_id),
+                ))
+        latest_agentic_for_objective: dict[tuple[str, str], str] = {}
+        for campaign_payload in self.database.list_agentic_campaign_payloads():
+            try:
+                campaign = AgenticCampaign.model_validate_json(campaign_payload)
+            except Exception:
+                continue
+            for payload in self.database.list_agentic_objective_payloads(campaign.campaign_id):
+                try:
+                    run = ObjectiveRun.model_validate_json(payload)
+                except Exception:
+                    continue
+                if run.automated_result != AgenticOutcome.REVIEW and not run.disagreement:
+                    continue
+                key = (run.target_id, run.objective_id)
+                superseded_by = latest_agentic_for_objective.get(key)
+                latest_agentic_for_objective.setdefault(key, run.objective_run_id)
+                review_id = f"agentic:{run.objective_run_id}"
+                objective = next(
+                    (item for item in load_objective_pack().objectives if item.objective_id == run.objective_id),
+                    None,
+                )
+                items.append(ReviewQueueItem(
+                    review_id=review_id, source_type="agentic", source_id=campaign.campaign_id,
+                    campaign_id=campaign.campaign_id, objective_run_id=run.objective_run_id,
+                    objective_id=run.objective_id,
+                    review_reason=run.human_review_reason or (
+                        "The optional judge disagreed with the deterministic result; human review is required."
+                        if run.disagreement else "Agentic trajectory requires human review."
+                    ),
+                    policy_categories=sorted({
+                        policy_categories[item] for item in (objective.applicable_policy_ids if objective else [])
+                        if item in policy_categories
+                    }),
+                    agentic_signal_summary=run.evaluator_summary,
+                    evidence_summary=(
+                        "Sanitized trajectory evidence is available. Protected responses, tool arguments, and "
+                        "hidden reasoning are excluded."
+                    ),
+                    target_id=run.target_id, timestamp=run.completed_at,
+                    automated_result=run.automated_result.value,
+                    is_stale=superseded_by is not None, superseded_by=superseded_by,
                     decision=self._review_decision(review_id),
                 ))
         try:
@@ -652,7 +698,15 @@ class DashboardService:
         )
 
     async def system_status(self) -> SystemStatus:
-        services = [ServiceHealth(service="audit-api", status="healthy", version=__version__, detail="Dashboard aggregation is available.")]
+        from careguard.agentic.objectives import load_objective_pack
+
+        services = [
+            ServiceHealth(service="audit-api", status="healthy", version=__version__, detail="Dashboard aggregation is available."),
+            ServiceHealth(
+                service="agentic-runner", status="healthy", version=load_objective_pack().version,
+                detail="Deterministic bounded runner is available in the audit API process.",
+            ),
+        ]
         for service, endpoint in (
             ("guard-gateway", os.getenv("CAREGUARD_GUARD_URL")),
             ("demo-agent", os.getenv("CAREGUARD_DEMO_URL")),

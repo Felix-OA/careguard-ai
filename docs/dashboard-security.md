@@ -11,6 +11,8 @@ The dashboard is designed for loopback-only synthetic evaluation. nginx binds ho
 - Markdown is rendered as plain React text with no arbitrary HTML or `dangerouslySetInnerHTML`.
 - Connectivity and job failures return bounded categories, not exception messages or stack traces.
 - Target URL validation accepts only exact HTTP origins for the two local synthetic service ports plus connector-specific chat paths. It rejects URL credentials, queries, fragments, redirects, alternate ports, public/unapproved hosts, and unsupported schemes; connector responses are capped at one megabyte and no discovery exists.
+- Agentic pages receive only typed campaign, objective, strategy, sanitized turn, comparison, report, and review objects from the Audit API. They cannot configure credentials or arbitrary targets, choose arbitrary strategy text, make attacker decisions, or invoke Guard/demo services directly.
+- Trajectory text is rendered through React text nodes and applies a second reasoning-shaped-content removal pass. No `dangerouslySetInnerHTML` or raw transcript export is used.
 
 The production bundle should be checked for secret-shaped strings and protected local paths during release validation. Dependency audits are informational and must be triaged rather than treated as proof of safety.
 
