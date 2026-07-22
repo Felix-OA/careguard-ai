@@ -1,15 +1,17 @@
 # Connector guide
 
-A connector implements the asynchronous `TargetConnector.send` method. Input includes target and conversation IDs, the current user message, prior normalized turns, and role metadata. Output includes the answer, retrieved sources and trust levels, proposed and executed tools, latency, provider/model identity, and a sanitized error category.
+A Stage 1-compatible connector implements asynchronous `send(NormalizedRequest) -> NormalizedResponse` and keeps credentials in private server-side state. Normalize answers, source trust/admission, active proposals, blocked/failed/executed tools, latency, provider/model, and sanitized error categories. Never copy headers, full exceptions, local paths, or credentials into evidence.
 
-Rules for new connectors:
+## External proxy control
 
-1. Keep keys and authorization headers in private connector fields populated from server environment state.
-2. Never copy headers, full exception messages, or request clients into evidence.
-3. Enforce an explicit authorized-target allowlist before connecting.
-4. Normalize retrieved and tool metadata even when the upstream field names differ.
-5. Return an error category rather than raising target internals into evidence.
-6. Test with a local fake server; tests must not call paid or public APIs.
+A generic REST or OpenAI-compatible proxy can inspect the incoming request, final response, and surfaced tool metadata. It cannot reliably distinguish raw retrieval from admitted context, prevent hidden target-side tool execution, or refill context unless the target exposes authenticated control points. Guard must document this reduced visibility rather than claim context filtering.
 
-Register a custom local target through `POST /targets` using `rest` or `openai_compatible`. Stage 1's endpoint guard permits localhost and named Compose services only.
+## Deep retrieval integration
 
+The synthetic demo exposes loopback, test-client, and Docker-network-only `/internal/retrieve` and `/internal/generate` endpoints. Guard fetches candidates, applies trust/scope controls, then supplies admitted context to generation with tool execution disabled. These demo hooks have no production authentication and must not be copied as a recommended design. A real integration needs authenticated, mutually authorized server-to-server hooks and server-derived identity/scope; production integration is outside Stage 2.
+
+## Audit and runtime connectors
+
+`DemoConnector` measures the baseline. `GuardConnector` adapts Guard output back to the Stage 1 normalized schema so the fixed suite can assess `demo-guarded`. The CLI runs this adapter in process; Docker’s audit API calls the separate Guard service.
+
+Endpoint validation permits HTTP(S) only, rejects URL credentials, and restricts targets to configured local/Docker hosts. Test new connectors against a local fake target; tests must not call public or paid APIs. The normalized `error` field should contain a bounded category such as an exception type, never an exception message or stack trace.

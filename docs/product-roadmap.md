@@ -2,17 +2,18 @@
 
 ## Stage 1 — Audit foundation
 
-Implemented: deterministic catalogs and evaluators, normalized connectors, local synthetic target, evidence, reports, API, CLI, and container workflow.
+Implemented: deterministic catalogs/evaluators, connectors, synthetic target, JSONL evidence, reports, API, CLI, and containers.
 
-## Future Audit work
+## Stage 2 — Guard
 
-A controlled multi-turn interface is defined in `careguard.audit.agentic`. A future GOAT-inspired runner may combine an attacker-agent adapter, target connector, evaluator, approved scenario objectives, conversation evidence, strict turn/cost limits, and explicit localhost or authorized-target enforcement. Stage 1 does not implement autonomous attack generation or operational jailbreak content.
+Implemented: separate runtime gateway, monitor/enforce modes, request rules, deep demo context admission/refill, response redaction/withholding, emergency policy response, tool authorization, bounded confirmation, structured events, guarded audits, and before/after comparisons.
 
-## Guard module
+## Stage 3 — Regression Monitor and dashboard
 
-Planned request/response policy enforcement, retrieval trust filtering, structured authorization, tool confirmation gates, redaction, and human-review routing. Guard decisions should emit evidence compatible with the Audit schema.
+Planned: approved scheduled replay, baseline drift, severity thresholds, traceable review, event/evidence dashboards, and guarded-policy change history. Backend APIs and services must own scheduling, policy, comparison, and review state; the UI must not contain security business logic. This repository does not yet implement the dashboard, scheduler, production identity/access control, durable review queue, database migrations, or tamper-evident event storage.
 
-## Regression Monitor module
+The pre-Stage-3 hardening pass establishes trustworthy fixed-suite evidence and a bounded local runtime. It does not make Stages 1–2 production-ready. See [pre-Stage-3 validation](pre-stage-3-validation.md).
 
-Planned scheduled replay of approved scenarios, baseline comparison, policy drift alerts, severity-aware thresholds, and traceable change review. It should remain opt-in and operate only on authorized targets.
+## Future controlled agentic audit
 
+The interface in `careguard.audit.agentic` remains a non-operational contract for approved objectives, strict turn/cost limits, conversation evidence, and authorized localhost targets. Stage 2 does not add autonomous attack generation.

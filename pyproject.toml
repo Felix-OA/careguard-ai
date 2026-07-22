@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "careguard-ai"
-version = "0.1.0"
-description = "Synthetic, local healthcare AI security audit foundation"
+version = "0.2.1"
+description = "Synthetic local healthcare AI security audit and runtime guard"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",
@@ -25,4 +25,3 @@ addopts = "-q"
 
 [tool.setuptools.packages.find]
 include = ["careguard*", "demo_health_agent*"]
-

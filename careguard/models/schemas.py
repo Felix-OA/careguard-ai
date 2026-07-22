@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class Result(StrEnum):
@@ -16,7 +16,7 @@ class Result(StrEnum):
 
 class ChatTurn(BaseModel):
     role: Literal["user", "assistant", "system"]
-    content: str
+    content: str = Field(max_length=20_000)
 
 
 class SourceMetadata(BaseModel):
@@ -38,9 +38,9 @@ class ToolCall(BaseModel):
 
 class NormalizedRequest(BaseModel):
     target_id: str
-    conversation_id: str
-    user_message: str
-    conversation_history: list[ChatTurn] = Field(default_factory=list)
+    conversation_id: str = Field(min_length=1, max_length=160, pattern=r"^[A-Za-z0-9:._-]+$")
+    user_message: str = Field(min_length=1, max_length=10_000)
+    conversation_history: list[ChatTurn] = Field(default_factory=list, max_length=50)
     role_metadata: dict[str, str] = Field(default_factory=dict)
 
 
@@ -50,11 +50,14 @@ class NormalizedResponse(BaseModel):
     answer: str = ""
     retrieved_sources: list[SourceMetadata] = Field(default_factory=list)
     proposed_tool_calls: list[ToolCall] = Field(default_factory=list)
+    blocked_tool_calls: list[ToolCall] = Field(default_factory=list)
+    failed_tool_calls: list[ToolCall] = Field(default_factory=list)
     executed_tool_calls: list[ToolCall] = Field(default_factory=list)
     latency_ms: float = 0
     provider: str = "deterministic-local"
     model: str = "careguard-demo-v1"
     error: str | None = None
+    guard_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class Policy(BaseModel):
@@ -107,7 +110,16 @@ class Scenario(BaseModel):
     tags: list[str]
     applicable_policy_ids: list[str]
     human_review_required: bool = False
+    human_review_reason: str | None = None
     enabled: bool = True
+
+    @model_validator(mode="after")
+    def require_review_reason(self) -> "Scenario":
+        if self.human_review_required and not self.human_review_reason:
+            raise ValueError("human_review_reason is required when human_review_required is true")
+        if not self.human_review_required and self.human_review_reason:
+            raise ValueError("human_review_reason requires human_review_required=true")
+        return self
 
 
 class ScenarioPack(BaseModel):
@@ -125,9 +137,9 @@ class ScenarioPack(BaseModel):
 
 
 class TargetCreate(BaseModel):
-    target_id: str
-    name: str
-    connector_type: Literal["demo", "rest", "openai_compatible"] = "demo"
+    target_id: str = Field(min_length=1, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
+    name: str = Field(min_length=1, max_length=160)
+    connector_type: Literal["demo", "guard", "rest", "openai_compatible"] = "demo"
     endpoint: str | None = None
     model: str | None = None
 
@@ -161,6 +173,8 @@ class EvidenceRecord(BaseModel):
     raw_answer: str
     retrieved_sources: list[SourceMetadata]
     proposed_tool_calls: list[ToolCall]
+    blocked_tool_calls: list[ToolCall] = Field(default_factory=list)
+    failed_tool_calls: list[ToolCall] = Field(default_factory=list)
     executed_tool_calls: list[ToolCall]
     evaluator_results: list[EvaluatorResult]
     final_result: Result
@@ -171,11 +185,15 @@ class EvidenceRecord(BaseModel):
     manual_review_notes: str | None = None
     latency_ms: float
     error: str | None = None
+    guard_mode: str | None = None
+    guard_config_version: str | None = None
+    guard_event_id: str | None = None
+    guard_final_decision: str | None = None
 
 
 class AuditRequest(BaseModel):
-    target_id: str = "demo"
-    scenario_ids: list[str] | None = None
+    target_id: str = Field(default="demo", min_length=1, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
+    scenario_ids: list[str] | None = Field(default=None, max_length=100)
 
 
 class AuditSummary(BaseModel):
@@ -186,3 +204,31 @@ class AuditSummary(BaseModel):
     counts: dict[str, int]
     evidence_path: str
 
+
+class ComparisonRequest(BaseModel):
+    baseline_run_id: str = Field(min_length=1, max_length=120, pattern=r"^[A-Za-z0-9._-]+$")
+    guarded_run_id: str = Field(min_length=1, max_length=120, pattern=r"^[A-Za-z0-9._-]+$")
+
+
+class ComparisonSummary(BaseModel):
+    comparison_id: str
+    created_at: datetime
+    baseline_run_id: str
+    guarded_run_id: str
+    baseline_target_id: str
+    guarded_target_id: str
+    identical_scope: bool
+    scenario_ids: list[str]
+    scope_validation: dict[str, Any] = Field(default_factory=dict)
+    policy_configuration: dict[str, Any] = Field(default_factory=dict)
+    baseline_metrics: dict[str, Any]
+    guarded_metrics: dict[str, Any]
+    security_improvements: list[str]
+    unchanged_risks: list[str]
+    regressions: list[str]
+    false_positives: list[str]
+    utility_tradeoffs: list[str]
+    scenario_results: list[dict[str, Any]] = Field(default_factory=list)
+    manual_review_notes: list[str]
+    markdown_report_path: str
+    json_report_path: str

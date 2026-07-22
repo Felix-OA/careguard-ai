@@ -19,6 +19,21 @@ def build_report(summary: AuditSummary, records: list[EvidenceRecord]) -> dict:
     for record in findings:
         for policy_id in scenario_map[record.scenario_id].applicable_policy_ids:
             affected_policies[policy_id].add(record.scenario_id)
+    retrieval_context_metrics = {
+        "raw_confidential_retrieval_records": sum(any(
+            source.trust_level == "confidential_synthetic"
+            for source in record.retrieved_sources
+        ) for record in records),
+        "confidential_context_admission_records": sum(any(
+            source.trust_level == "confidential_synthetic" and source.admitted_to_context
+            for source in record.retrieved_sources
+        ) for record in records),
+        "untrusted_context_admission_records": sum(any(
+            source.trust_level == "untrusted" and source.admitted_to_context
+            for source in record.retrieved_sources
+        ) for record in records),
+        "answer_disclosure_findings": dimensions.get("answer_disclosure", 0),
+    }
     return {
         "title": "CareGuard AI Synthetic Local Assessment",
         "executive_summary": {
@@ -29,6 +44,10 @@ def build_report(summary: AuditSummary, records: list[EvidenceRecord]) -> dict:
         },
         "scope": "Controlled local assessment using fictional healthcare data and deterministic scenarios.",
         "target": {"target_id": summary.target_id, "scenario_count": len(records)},
+        "guard_configuration": {
+            "mode": next((record.guard_mode for record in records if record.guard_mode), None),
+            "version": next((record.guard_config_version for record in records if record.guard_config_version), None),
+        },
         "scenario_coverage": [record.scenario_id for record in records],
         "findings_by_severity": dict(severity),
         "findings_by_dimension": dict(dimensions),
@@ -37,6 +56,7 @@ def build_report(summary: AuditSummary, records: list[EvidenceRecord]) -> dict:
             "context_admission": dimensions.get("context_admission", 0),
             "answer_disclosure": dimensions.get("answer_disclosure", 0),
         },
+        "retrieval_context_metrics": retrieval_context_metrics,
         "tool_findings": {
             "tool_proposal": dimensions.get("tool_proposal", 0),
             "tool_execution": dimensions.get("tool_execution", 0),
@@ -50,6 +70,9 @@ def build_report(summary: AuditSummary, records: list[EvidenceRecord]) -> dict:
                 "expected_behavior": record.expected_behavior,
                 "answer": record.raw_answer,
                 "evaluator_results": [item.model_dump(mode="json") for item in record.evaluator_results],
+                "manual_review_reason": record.manual_review_notes,
+                "guard_event_id": record.guard_event_id,
+                "guard_final_decision": record.guard_final_decision,
             }
             for record in findings
         ],
@@ -94,10 +117,19 @@ def report_markdown(summary: AuditSummary, records: list[EvidenceRecord]) -> str
         "## Findings by severity",
         "",
     ]
+    guard_configuration = report["guard_configuration"]
+    if guard_configuration["mode"]:
+        lines += [
+            f"Guard configuration: mode `{guard_configuration['mode']}`, version `{guard_configuration['version']}`.",
+            "",
+        ]
     for severity, count in sorted(report["findings_by_severity"].items()):
         lines.append(f"- {severity}: {count}")
-    lines += ["", "## Retrieval versus answer findings", ""]
-    for key, count in report["retrieval_vs_answer"].items():
+    lines += [
+        "", "## Retrieval, context, and answer metrics", "",
+        "These are separate scenario-level counts; raw retrieval is not context admission or answer disclosure.", "",
+    ]
+    for key, count in report["retrieval_context_metrics"].items():
         lines.append(f"- {key.replace('_', ' ')}: {count}")
     lines += ["", "## Tool-related findings", ""]
     for key, count in report["tool_findings"].items():
@@ -112,6 +144,8 @@ def report_markdown(summary: AuditSummary, records: list[EvidenceRecord]) -> str
             f"Expected: {finding['expected_behavior']}", "",
             f"Observed synthetic answer: {finding['answer']}", "",
         ]
+        if finding["manual_review_reason"]:
+            lines += [f"Manual-review reason: {finding['manual_review_reason']}", ""]
     lines += ["## Remediation recommendations", ""]
     lines.extend(f"- {item}" for item in report["remediation_recommendations"])
     lines += ["", "## Limitations", ""]
@@ -127,4 +161,3 @@ def write_reports(summary: AuditSummary, records: list[EvidenceRecord], director
     markdown_path.write_text(report_markdown(summary, records), encoding="utf-8")
     json_path.write_text(report_json(summary, records), encoding="utf-8")
     return markdown_path, json_path
-

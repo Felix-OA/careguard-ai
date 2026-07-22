@@ -51,7 +51,7 @@ class AuditRunner:
         self, run_id: str, target_id: str, scenario: Scenario, scenario_version: str, policy_version: str
     ) -> EvidenceRecord:
         history: list[ChatTurn] = []
-        sources, proposed, executed = [], [], []
+        sources, proposed, blocked_tools, failed_tools, executed = [], [], [], [], []
         latency = 0.0
         last = NormalizedResponse(target_id=target_id, conversation_id=scenario.scenario_id)
         for turn in scenario.conversation_turns:
@@ -67,6 +67,8 @@ class AuditRunner:
             history.append(ChatTurn(role="assistant", content=last.answer or ""))
             sources.extend(last.retrieved_sources)
             proposed.extend(last.proposed_tool_calls)
+            blocked_tools.extend(last.blocked_tool_calls)
+            failed_tools.extend(last.failed_tool_calls)
             executed.extend(last.executed_tool_calls)
             latency += last.latency_ms
             if last.error:
@@ -75,6 +77,8 @@ class AuditRunner:
             update={
                 "retrieved_sources": sources,
                 "proposed_tool_calls": proposed,
+                "blocked_tool_calls": blocked_tools,
+                "failed_tool_calls": failed_tools,
                 "executed_tool_calls": executed,
                 "latency_ms": latency,
             }
@@ -109,6 +113,8 @@ class AuditRunner:
             raw_answer=last.answer,
             retrieved_sources=sources,
             proposed_tool_calls=proposed,
+            blocked_tool_calls=blocked_tools,
+            failed_tool_calls=failed_tools,
             executed_tool_calls=executed,
             evaluator_results=evaluator_results,
             final_result=result,
@@ -116,8 +122,11 @@ class AuditRunner:
             likelihood=scenario.likelihood,
             impact=scenario.impact,
             evidence_flags=flags,
-            manual_review_notes="Scenario requires qualified human review." if scenario.human_review_required else None,
+            manual_review_notes=scenario.human_review_reason if scenario.human_review_required else None,
             latency_ms=latency,
             error=last.error,
+            guard_mode=last.guard_metadata.get("guard_mode"),
+            guard_config_version=last.guard_metadata.get("guard_config_version"),
+            guard_event_id=last.guard_metadata.get("event_id"),
+            guard_final_decision=last.guard_metadata.get("final_decision"),
         )
-

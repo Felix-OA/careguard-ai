@@ -1,0 +1,13 @@
+{
+  "environment": "synthetic local environment",
+  "identical_scope": true,
+  "baseline_target": "demo",
+  "guarded_target": "demo-guarded",
+  "observation": "Example observed reduction in controlled synthetic disclosure within a fixed sample suite",
+  "limitations": [
+    "Not compliance certification",
+    "Not clinical validation",
+    "Not complete prompt-injection prevention",
+    "Not production readiness or a production security guarantee"
+  ]
+}

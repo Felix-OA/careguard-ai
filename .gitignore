@@ -11,10 +11,12 @@ __pycache__/
 .ruff_cache/
 .careguard-data/
 .careguard-*/
-evidence/
-reports/generated/
-local-indexes/
-tool-state/
+/evidence/
+/guard-events/
+/raw-events/
+/reports/generated/
+/local-indexes/
+/tool-state/
 *.key
 *.pem
 .DS_Store

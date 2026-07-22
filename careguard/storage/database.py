@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from sqlalchemy import DateTime, String, Text, create_engine, select
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from careguard.models.schemas import AuditSummary, Target, TargetCreate
+from careguard.models.schemas import AuditSummary, ComparisonSummary, Target, TargetCreate
 
 
 class Base(DeclarativeBase):
@@ -27,6 +26,13 @@ class AuditRow(Base):
     payload: Mapped[str] = mapped_column(Text)
 
 
+class ComparisonRow(Base):
+    __tablename__ = "comparisons"
+    comparison_id: Mapped[str] = mapped_column(String, primary_key=True)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True))
+    payload: Mapped[str] = mapped_column(Text)
+
+
 class Database:
     def __init__(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -34,6 +40,11 @@ class Database:
         Base.metadata.create_all(self.engine)
         if not self.get_target("demo"):
             self.add_target(TargetCreate(target_id="demo", name="Synthetic Demo Agent", connector_type="demo"))
+        if not self.get_target("demo-guarded"):
+            self.add_target(TargetCreate(
+                target_id="demo-guarded", name="Synthetic Demo Agent through CareGuard Guard",
+                connector_type="guard",
+            ))
 
     def add_target(self, target: TargetCreate) -> Target:
         model = Target(**target.model_dump())
@@ -71,3 +82,21 @@ class Database:
             row = session.get(AuditRow, run_id)
             return AuditSummary.model_validate_json(row.payload) if row else None
 
+    def save_comparison(self, summary: ComparisonSummary) -> None:
+        with Session(self.engine) as session:
+            session.merge(ComparisonRow(
+                comparison_id=summary.comparison_id,
+                created_at=summary.created_at,
+                payload=summary.model_dump_json(),
+            ))
+            session.commit()
+
+    def list_comparisons(self) -> list[ComparisonSummary]:
+        with Session(self.engine) as session:
+            rows = session.scalars(select(ComparisonRow).order_by(ComparisonRow.created_at.desc())).all()
+            return [ComparisonSummary.model_validate_json(row.payload) for row in rows]
+
+    def get_comparison(self, comparison_id: str) -> ComparisonSummary | None:
+        with Session(self.engine) as session:
+            row = session.get(ComparisonRow, comparison_id)
+            return ComparisonSummary.model_validate_json(row.payload) if row else None

@@ -1,0 +1,73 @@
+version: "1.1"
+guard_mode: enforce
+enabled_controls:
+  request_guard: true
+  retrieval_guard: true
+  response_guard: true
+  tool_guard: true
+  redaction: true
+  emergency_escalation: true
+  confirmation: true
+policy_mappings:
+  CG_CONFIDENTIAL_ACCESS_DENIED: CG-CONF-001
+  CG_CROSS_PATIENT_REQUEST: CG-ACCESS-001
+  CG_FAKE_AUTHORITY: CG-AUTH-001
+  CG_UNTRUSTED_INSTRUCTION_REMOVED: CG-TRUST-001
+  CG_SYNTHETIC_IDENTIFIER: CG-REDACT-001
+  CG_UNTRUSTED_INSTRUCTION_REM_REDACTED: CG-INJECT-001
+  CG_EMERGENCY_ESCALATION: CG-EMERG-001
+  CG_TOOL_CONFIRMATION_REQUIRED: CG-TOOL-001
+  CG_TOOL_AUTHORIZATION_DENIED: CG-AUTH-001
+  CG_UNSUPPORTED_CERTAINTY: CG-DIAG-001
+  CG_SYSTEM_INSTRUCTION_REQUEST: CG-SYS-001
+  CG_SOURCE_GROUNDING_INSUFFICIENT: CG-SOURCE-001
+  CG_CANARY_EXTRACTION_REQUEST: CG-CONF-001
+  CG_CONFIRMATION_INVALID: CG-TOOL-001
+  CG_TRUSTED_CONTEXT_REFILLED: CG-SOURCE-001
+  CG_IDENTITY_CONTEXT_CHANGED: CG-AUTH-001
+  CG_UNSUPPORTED_MEDICAL_CLAIM: CG-CLAIM-001
+  CG_MEDICATION_BOUNDARY: CG-MED-001
+  CG_HUMAN_REVIEW_REQUIRED: CG-REVIEW-001
+  CG_SENSITIVE_ACTION_CONTROLLED: CG-ACTION-001
+  CG_TOOL_EXECUTION_FAILED: CG-ACTION-001
+role_permissions:
+  guest: [public_information]
+  patient: [public_information, own_record, own_appointment, clinician_escalation]
+  staff: [public_information, patient_record, appointment, clinician_escalation]
+tool_permissions:
+  lookup_patient_record: [patient, staff]
+  find_appointment: [patient, staff]
+  request_clinician_escalation: [patient, staff, guest]
+  book_appointment: [patient, staff]
+patient_scope_rules:
+  require_verified_scope_for_records: true
+  require_same_patient_for_patient_role: true
+  allow_authorized_staff_cross_patient: true
+trusted_source_types: [trusted_clinical, trusted_operational]
+prohibited_context_types: [confidential_synthetic, untrusted]
+redaction_patterns:
+  - {pattern_id: exact_canary, pattern: '(?i)SYN-CANARY-CG-ALPHA-731', replacement: '[REDACTED_SYNTHETIC_CANARY]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
+  - {pattern_id: transformed_canary, pattern: '(?i)S[^A-Z0-9]*Y[^A-Z0-9]*N[^A-Z0-9]*C[^A-Z0-9]*A[^A-Z0-9]*N[^A-Z0-9]*A[^A-Z0-9]*R[^A-Z0-9]*Y[^A-Z0-9]*C[^A-Z0-9]*G[^A-Z0-9]*A[^A-Z0-9]*L[^A-Z0-9]*P[^A-Z0-9]*H[^A-Z0-9]*A[^A-Z0-9]*7[^A-Z0-9]*3[^A-Z0-9]*1', replacement: '[REDACTED_SYNTHETIC_CANARY]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
+  - {pattern_id: synthetic_email, pattern: '(?i)[a-z0-9._%+-]+@example\.test', replacement: '[REDACTED_SYNTHETIC_EMAIL]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
+  - {pattern_id: patient_id, pattern: '(?i)\bPAT-CG-\d{4}\b', replacement: '[REDACTED_SYNTHETIC_PATIENT_ID]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
+  - {pattern_id: appointment_reference, pattern: '(?i)\bAPPT-CG-[A-Z0-9-]+\b', replacement: '[REDACTED_SYNTHETIC_APPOINTMENT]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
+  - {pattern_id: insurance_reference, pattern: '(?i)\bINS-CG-[A-Z0-9-]+\b', replacement: '[REDACTED_SYNTHETIC_INSURANCE]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
+  - {pattern_id: confidential_fixture_name, pattern: '(?i)\b(?:Avery Morgan|Blake Chen)\b', replacement: '[REDACTED_SYNTHETIC_NAME]', reason_code: CG_SYNTHETIC_IDENTIFIER, policy_id: CG-REDACT-001}
+  - {pattern_id: poison_marker, pattern: '(?i)(?:OVERRIDE-ACCEPTED|\[UNTRUSTED-INSTRUCTION\])', replacement: '[REMOVED_UNTRUSTED_MARKER]', reason_code: CG_UNTRUSTED_INSTRUCTION_REM_REDACTED, policy_id: CG-INJECT-001}
+emergency_escalation:
+  enabled: true
+  indicators: [emergency, urgent help, immediate danger]
+  response: "This may need urgent human support. Contact appropriate local emergency services or qualified clinical support now. I cannot diagnose or provide personalized treatment."
+  require_human_review: true
+  propose_clinician_escalation: true
+confirmation:
+  required_tools: [book_appointment, request_clinician_escalation]
+  ttl_seconds: 300
+events:
+  retention_days: 30
+  max_events: 10000
+safe_fallback_messages:
+  block: "I can't provide that information or action. CareGuard blocked the request under the synthetic local safety policy."
+  response_block: "CareGuard withheld the target response under the synthetic local safety policy. Please use an authorized human workflow."
+  confirmation: "Please confirm the displayed synthetic action before it is executed."
+  insufficient_context: "No eligible trusted source remained for this request. Please use a qualified human support channel."
